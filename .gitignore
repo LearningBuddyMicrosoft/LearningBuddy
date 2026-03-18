@@ -1,0 +1,16 @@
+# Ignore all files ending in .db or .sqlite
+*.db
+*.sqlite
+*.sqlite3
+
+# Ignore SQL dumps
+*.sql
+
+# Ignore specific local database folders
+bin/
+data/
+# Python bytecode
+*.pyc
+*.pyo
+*.pyd
+__pycache__/
