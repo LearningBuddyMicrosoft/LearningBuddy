@@ -14,3 +14,6 @@ data/
 *.pyo
 *.pyd
 __pycache__/
+
+#Ignore Node.js Modules
+node_modules/
