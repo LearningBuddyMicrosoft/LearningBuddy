@@ -44,7 +44,7 @@ def smart_chunk_by_headers(pdf_path):
     return chunks
 
 # --- How to run it ---
-my_messy_pdf = "lecture_notes.pdf" # Put a real lecture PDF here
+my_messy_pdf = r"C:\Users\hp\OneDrive\Desktop\Maynooth work\Microsoft Mentored Learning Buddy\repo\LearningBuddy\pdfReaderLocal\Lecture4.pdf" # Put a real lecture PDF here
 semantic_chunks = smart_chunk_by_headers(my_messy_pdf)
 
 # Print out the structured chunks!
