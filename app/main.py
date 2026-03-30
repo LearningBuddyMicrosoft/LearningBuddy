@@ -3,7 +3,7 @@ from sqlmodel import Session, select, func
 from .database import engine
 from datetime import date
 from .models import Question, Response, Topic, User, QuizAttempt # From your previous steps
-from.schemas import UserCreate, StartAttempt, AnswerSubmission, FinishAttempt, BatchSubmission
+from.schemas import DashboardRead, TopicDetailedRead, UserCreate, StartAttempt, AnswerSubmission, FinishAttempt, BatchSubmission
 
 app = FastAPI()
 
@@ -153,3 +153,19 @@ def grade_and_build_response(submission: AnswerSubmission, session: Session):
         feedback=feedback   
         )
     return response
+
+@app.get("/user/{user_id}/dashboard", response_model=DashboardRead)
+def get_user_dashboard(user_id: int, session: Session = Depends(get_session)):
+    user = session.get(User, user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    return user
+
+@app.get("/topic/{topic_id}/details", response_model=TopicDetailedRead)
+def get_topic_details(topic_id: int, session: Session = Depends(get_session)):
+    topic = session.get(Topic, topic_id)
+    if not topic:
+        raise HTTPException(status_code=404, detail="Topic not found")
+    
+    return topic

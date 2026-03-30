@@ -45,6 +45,7 @@ def seed_data():
         # 5. Add the Question Bank
         q1 = Question(
             topic_id=topic_patterns.id,
+            difficulty= 2,
             question_type="MCQ",
             question_text="Which pattern allows incompatible interfaces to work together?",
             options=["Builder", "Decorator", "Adapter", "Singleton"],
@@ -52,6 +53,7 @@ def seed_data():
         )
         q2 = Question(
             topic_id=topic_patterns.id,
+            difficulty= 3,
             question_type="MCQ",
             question_text="Which pattern lets you attach new behaviors to objects by placing them inside wrapper objects?",
             options=["Decorator", "Builder", "Factory", "Adapter"],

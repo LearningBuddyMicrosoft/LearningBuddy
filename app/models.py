@@ -33,7 +33,7 @@ class Topic(SQLModel, table=True):
     subject: Subject = Relationship(back_populates="topics")
     materials: List["Material"] = Relationship(back_populates="topic")
     quiz_questions: List["Question"] = Relationship(back_populates="topic")
-    quiz_attempts: List["QuizAttempt"] = Relationship(back_populates="topic", link_model=QuizAttempt_TopicLink)
+    quiz_attempts: List["QuizAttempt"] = Relationship(back_populates="topics", link_model=QuizAttempt_TopicLink)
 
 
     name: str
