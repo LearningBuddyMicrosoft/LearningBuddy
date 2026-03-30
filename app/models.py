@@ -22,6 +22,10 @@ class Subject(SQLModel, table=True):
 
     name: str
 
+class QuizAttempt_TopicLink(SQLModel, table=True):
+    topic_id: Optional[int] = Field(foreign_key="topic.id", primary_key=True)
+    quiz_attempt_id: Optional[int] = Field(foreign_key="quizattempt.id", primary_key=True)
+
 class Topic(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
 
@@ -29,7 +33,7 @@ class Topic(SQLModel, table=True):
     subject: Subject = Relationship(back_populates="topics")
     materials: List["Material"] = Relationship(back_populates="topic")
     quiz_questions: List["Question"] = Relationship(back_populates="topic")
-    quiz_attempts: List["QuizAttempt"] = Relationship(back_populates="topic")
+    quiz_attempts: List["QuizAttempt"] = Relationship(back_populates="topic", link_model=QuizAttempt_TopicLink)
 
 
     name: str
@@ -42,6 +46,8 @@ class QuizAttempt(SQLModel, table=True):
     user_id: int = Field(foreign_key="user.id")
     user: User = Relationship(back_populates="attempts") 
     responses: List["Response"] = Relationship(back_populates="attempt")
+    topics: List["Topic"] = Relationship(back_populates="quiz_attempts", link_model=QuizAttempt_TopicLink)
+
 
     quiz_mode: str = Field(default="single")  # e.g., "single", "batch"
     date: str

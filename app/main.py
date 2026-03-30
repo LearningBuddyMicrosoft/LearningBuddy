@@ -2,7 +2,7 @@ from fastapi import FastAPI, Depends, HTTPException
 from sqlmodel import Session, select, func
 from .database import engine
 from datetime import date
-from .models import Question, Response, User, QuizAttempt # From your previous steps
+from .models import Question, Response, Topic, User, QuizAttempt # From your previous steps
 from.schemas import UserCreate, StartAttempt, AnswerSubmission, FinishAttempt, BatchSubmission
 
 app = FastAPI()
@@ -52,6 +52,12 @@ def start_attempt(start_attempt: StartAttempt, session: Session = Depends(get_se
         score=0,
         feedback=""
     )
+    for topic_id in start_attempt.topic_ids:
+        topic = session.get(Topic, topic_id)
+        if not topic:
+            raise HTTPException(status_code=404, detail=f"Topic with ID {topic_id} not found")
+        new_attempt.topics.append(topic)
+
     session.add(new_attempt)
     session.commit()
     session.refresh(new_attempt)
