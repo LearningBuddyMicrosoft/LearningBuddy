@@ -1,6 +1,7 @@
 from sqlmodel import Session, SQLModel
 from database import engine 
-from models import User, Subject, Topic, Material, Question
+# ADDED: Don't forget to import Quiz!
+from models import User, Subject, Topic, Material, Question, Quiz
 
 
 #run to create local test data
@@ -60,10 +61,27 @@ def seed_data():
             correct_answer="Decorator"
         )
         session.add_all([q1, q2])
+        session.commit() # Commit so the questions get their IDs!
+
+        # 6. Build the Test Paper (The Quiz)
+        print("Building Quiz...")
+        mock_quiz = Quiz(
+            user_id=user1.id,
+            name="Design Patterns Midterm Review",
+            open_ended=False,
+            length=2,
+            highscore=0
+        )
+        
+        # The SQLModel Magic: Link the Topic and the Questions directly to the Quiz
+        mock_quiz.topics.append(topic_patterns)
+        mock_quiz.questions.extend([q1, q2]) # .extend() is like append, but for a list!
+        
+        session.add(mock_quiz)
 
         # Save everything to the database
         session.commit()
-        print("Database successfully seeded! User-specific subjects created.")
+        print("Database successfully seeded! User-specific subjects and quizzes created.")
 
 if __name__ == "__main__":
     seed_data()

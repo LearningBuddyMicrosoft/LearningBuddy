@@ -4,7 +4,6 @@ from .database import engine
 from datetime import date
 from .models import Question, Response, Topic, User, QuizAttempt # From your previous steps
 from.schemas import DashboardRead, TopicDetailedRead, UserCreate, StartAttempt, AnswerSubmission, FinishAttempt, BatchSubmission
-
 app = FastAPI()
 
 # This is your 'Dependency'. It manages the connection for each request.
@@ -41,23 +40,17 @@ def create_user(user_data: UserCreate, session: Session = Depends(get_session)):
 
 #called everytime a quiz is started
 @app.post("/start-attempt/")
-def start_attempt(start_attempt: StartAttempt, session: Session = Depends(get_session)):
-    user = session.get(User, start_attempt.user_id)
+def start_attempt(payload: StartAttempt, session: Session = Depends(get_session)):
+    user = session.get(User, payload.user_id)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")   
     new_attempt = QuizAttempt(
-        user_id=start_attempt.user_id,
-        quiz_mode=start_attempt.quiz_mode,
+        user_id=payload.user_id,
+        quiz_id=payload.quiz_id,
         date=date.today().isoformat(),
         score=0,
         feedback=""
     )
-    for topic_id in start_attempt.topic_ids:
-        topic = session.get(Topic, topic_id)
-        if not topic:
-            raise HTTPException(status_code=404, detail=f"Topic with ID {topic_id} not found")
-        new_attempt.topics.append(topic)
-
     session.add(new_attempt)
     session.commit()
     session.refresh(new_attempt)
@@ -154,7 +147,7 @@ def grade_and_build_response(submission: AnswerSubmission, session: Session):
         )
     return response
 
-@app.get("/user/{user_id}/dashboard", response_model=DashboardRead)
+@app.get("/user/{user_id}/mainpage", response_model=DashboardRead)
 def get_user_dashboard(user_id: int, session: Session = Depends(get_session)):
     user = session.get(User, user_id)
     if not user:
@@ -162,8 +155,8 @@ def get_user_dashboard(user_id: int, session: Session = Depends(get_session)):
     
     return user
 
-@app.get("/topic/{topic_id}/details", response_model=TopicDetailedRead)
-def get_topic_details(topic_id: int, session: Session = Depends(get_session)):
+@app.get("/user/{user_id}/topic/{topic_id}/details", response_model=TopicDetailedRead)
+def get_topic_details(user_id: int, topic_id: int, session: Session = Depends(get_session)):
     topic = session.get(Topic, topic_id)
     if not topic:
         raise HTTPException(status_code=404, detail="Topic not found")
