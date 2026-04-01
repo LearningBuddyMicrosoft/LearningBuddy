@@ -51,3 +51,11 @@ class DashboardRead(BaseModel):
     id: int
     username: str
     subjects: List[SubjectRead] = []
+
+class SubjectCreate(BaseModel):
+    user_id: int
+    name: str
+
+class TopicCreate(BaseModel):
+    subject_id: int
+    name: str
