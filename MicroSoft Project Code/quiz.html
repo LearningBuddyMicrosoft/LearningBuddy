@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>QuizStar - Quiz</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- NAVBAR -->
+<nav class="navbar">
+    <h2 class="logo">QuizStar</h2>
+    <ul>
+        <li><a href="index.html">Home</a></li>
+        <li><a href="quiz.html">Take Quiz</a></li>
+        <li><a href="history.html">Quiz History</a></li>
+        <li><a href="profile.html">My Profile</a></li>
+    </ul>
+</nav>
+
+<!-- QUIZ CONTENT -->
+<div class="container">
+
+    <h2>Quiz Title</h2>
+    <p>Question 1 of 10</p>
+
+    <!-- IMAGE -->
+    <img src="https://cdn-icons-png.flaticon.com/512/3135/3135755.png" width="100">
+
+    <!-- QUESTION -->
+    <p id="questionText">Which protocol guarantees delivery?</p>
+
+    <!-- CLICKABLE OPTIONS -->
+    <div id="options">
+        <button class="option-btn" onclick="selectOption(this)">Option One</button>
+        <button class="option-btn" onclick="selectOption(this)">Option Two</button>
+        <button class="option-btn" onclick="selectOption(this)">Option Three</button>
+        <button class="option-btn" onclick="selectOption(this)">Option Four</button>
+    </div>
+
+    <!-- SHOW SELECTED -->
+    <p id="selectedText"></p>
+
+    <br>
+
+    <button onclick="nextQuestion()">Next Question</button>
+    <button onclick="submitQuiz()">Submit Quiz</button>
+
+</div>
+
+<script src="script.js"></script>
+<div class="footer">
+    <p>© 2026 QuizStar | AI Study Assistant</p>
+</div>
+</body>
+</html>
