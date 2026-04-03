@@ -112,3 +112,6 @@ def seed_data():
         session.commit()
 
         print("Database seeded with rich dataset!")
+
+if __name__ == "__main__":
+    seed_data()

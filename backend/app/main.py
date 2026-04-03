@@ -1,9 +1,11 @@
-from fastapi import FastAPI, Depends, HTTPException
+import os
+
+from fastapi import FastAPI, Depends, File, Form, HTTPException, UploadFile
 from sqlmodel import Session, select, func
 from .database import engine
 from datetime import date
-from .models import Question, Response, Topic, User, QuizAttempt # From your previous steps
-from.schemas import DashboardRead, TopicDetailedRead, UserCreate, StartAttempt, AnswerSubmission, FinishAttempt, BatchSubmission
+from .models import Material, Question, Response, Subject, Topic, User, QuizAttempt # From your previous steps
+from.schemas import DashboardRead, SubjectCreate, TopicCreate, TopicDetailedRead, UserCreate, StartAttempt, AnswerSubmission, FinishAttempt, BatchSubmission
 
 app = FastAPI()
 
@@ -41,23 +43,17 @@ def create_user(user_data: UserCreate, session: Session = Depends(get_session)):
 
 #called everytime a quiz is started
 @app.post("/start-attempt/")
-def start_attempt(start_attempt: StartAttempt, session: Session = Depends(get_session)):
-    user = session.get(User, start_attempt.user_id)
+def start_attempt(payload: StartAttempt, session: Session = Depends(get_session)):
+    user = session.get(User, payload.user_id)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")   
     new_attempt = QuizAttempt(
-        user_id=start_attempt.user_id,
-        quiz_mode=start_attempt.quiz_mode,
+        user_id=payload.user_id,
+        quiz_id=payload.quiz_id,
         date=date.today().isoformat(),
         score=0,
         feedback=""
     )
-    for topic_id in start_attempt.topic_ids:
-        topic = session.get(Topic, topic_id)
-        if not topic:
-            raise HTTPException(status_code=404, detail=f"Topic with ID {topic_id} not found")
-        new_attempt.topics.append(topic)
-
     session.add(new_attempt)
     session.commit()
     session.refresh(new_attempt)
@@ -154,7 +150,7 @@ def grade_and_build_response(submission: AnswerSubmission, session: Session):
         )
     return response
 
-@app.get("/user/{user_id}/dashboard", response_model=DashboardRead)
+@app.get("/user/{user_id}/mainpage", response_model=DashboardRead)
 def get_user_dashboard(user_id: int, session: Session = Depends(get_session)):
     user = session.get(User, user_id)
     if not user:
@@ -162,10 +158,60 @@ def get_user_dashboard(user_id: int, session: Session = Depends(get_session)):
     
     return user
 
-@app.get("/topic/{topic_id}/details", response_model=TopicDetailedRead)
-def get_topic_details(topic_id: int, session: Session = Depends(get_session)):
+@app.get("/user/{user_id}/topic/{topic_id}/details", response_model=TopicDetailedRead)
+def get_topic_details(user_id: int, topic_id: int, session: Session = Depends(get_session)):
     topic = session.get(Topic, topic_id)
     if not topic:
         raise HTTPException(status_code=404, detail="Topic not found")
     
     return topic
+
+@app.post("/subjects/")
+def create_subject(payload: SubjectCreate, session: Session = Depends(get_session)):
+    user = session.get(User, payload.user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    new_subject = Subject(
+        user_id=payload.user_id,
+        name=payload.name)
+    session.add(new_subject)
+    session.commit()
+    session.refresh(new_subject)
+    return new_subject
+
+@app.post("/topics/")
+def create_topic(payload: TopicCreate, session: Session = Depends(get_session)):
+    subject = session.get(Subject, payload.subject_id)
+    if not subject:
+        raise HTTPException(status_code=404, detail="Subject not found")
+    new_topic = Topic(
+        subject_id=payload.subject_id,
+        name=payload.name)
+    session.add(new_topic)
+    session.commit()
+    session.refresh(new_topic)
+    return new_topic
+
+@app.post("/materials/upload")
+def add_material(topic_id: int = Form(...), file: UploadFile = File(...), session: Session = Depends(get_session)):
+    topic = session.get(Topic, topic_id)
+    if not topic:
+        raise HTTPException(status_code=404, detail="Topic not found")
+    
+   #store physically on computer for now, will be moving to cloud storage in the future
+    upload_dir = "materials"
+    os.makedirs(upload_dir, exist_ok=True)
+    file_path = os.path.join(upload_dir, file.filename)
+    with open(file_path, "wb") as buffer:
+        buffer.write(file.file.read())
+
+    new_material = Material(
+        name=file.filename,
+        file_path=file_path,
+        topic_id=topic_id
+    )
+    
+    session.add(new_material)
+    session.commit()
+    session.refresh(new_material)
+    return new_material

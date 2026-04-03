@@ -6,8 +6,7 @@ class UserCreate(BaseModel):
 
 class StartAttempt(BaseModel):
     user_id: int
-    quiz_mode: str = "single"  # default to single mode
-    topic_ids: List[int] = []  # Optional list of topic IDs for batch mode
+    quiz_id: int
 
 class FinishAttempt(BaseModel):
     attempt_id: int
@@ -23,10 +22,10 @@ class BatchSubmission(BaseModel):
     attempt_id: int
     answers : List[AnswerSubmission]
 
-class QuizAttemptSummary(BaseModel):
-    attempt_id: int
-    score: int
-    date: str
+class QuizSummary(BaseModel):
+    id: int
+    name: str
+    highscore: int
     
 class MaterialRead(BaseModel):
     id: int
@@ -37,7 +36,7 @@ class TopicDetailedRead(BaseModel):
     id: int
     name: str
     materials: List[MaterialRead] = []
-    quiz_attempts: List[QuizAttemptSummary] = []
+    quizzes: List[QuizSummary] = []
 
 class TopicRead(BaseModel):
     id: int
@@ -52,3 +51,11 @@ class DashboardRead(BaseModel):
     id: int
     username: str
     subjects: List[SubjectRead] = []
+
+class SubjectCreate(BaseModel):
+    user_id: int
+    name: str
+
+class TopicCreate(BaseModel):
+    subject_id: int
+    name: str
