@@ -6,6 +6,8 @@ from sqlalchemy import JSON, Column
 class User(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
 
+    hashed_password: str
+
     attempts: List["QuizAttempt"] = Relationship(back_populates="user")
     responses: List["Response"] = Relationship(back_populates="user")
     subjects: List["Subject"] = Relationship(back_populates="user")

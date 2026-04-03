@@ -1,7 +1,9 @@
-# Ignore all files ending in .db or .sqlite
+# Ignore all files ending in .db or .sqlite or .env or .pdf
 *.db
 *.sqlite
 *.sqlite3
+.env
+*.pdf
 
 # Ignore SQL dumps
 *.sql

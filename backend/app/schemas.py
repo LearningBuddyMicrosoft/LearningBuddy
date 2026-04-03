@@ -3,22 +3,20 @@ from typing import List
 
 class UserCreate(BaseModel):
     username: str
+    password: str
 
 class StartAttempt(BaseModel):
-    user_id: int
     quiz_id: int
 
 class FinishAttempt(BaseModel):
     attempt_id: int
 
 class AnswerSubmission(BaseModel):
-    user_id: int
     attempt_id: int
     question_id: int
     selected_option: str
 
 class BatchSubmission(BaseModel):
-    user_id: int
     attempt_id: int
     answers : List[AnswerSubmission]
 
@@ -53,9 +51,8 @@ class DashboardRead(BaseModel):
     subjects: List[SubjectRead] = []
 
 class SubjectCreate(BaseModel):
-    user_id: int
     name: str
 
 class TopicCreate(BaseModel):
-    subject_id: int
     name: str
+    subject_id: int
