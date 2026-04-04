@@ -2,6 +2,7 @@ def seed_data():
     from sqlmodel import Session, SQLModel
     from .database import engine
     from .models import User, Subject, Topic, Material, Question
+    from .security import get_password_hash
 
     print("Resetting database...")
     SQLModel.metadata.drop_all(engine)
@@ -10,10 +11,13 @@ def seed_data():
     with Session(engine) as session:
 
         # --- USERS ---
+        # Generate a standard hashed password for easy testing
+        test_password = get_password_hash("password123")
+        
         users = [
-            User(username="Jia Jun"),
-            User(username="Alice"),
-            User(username="Bob"),
+            User(username="Jia Jun", hashed_password=test_password),
+            User(username="Alice", hashed_password=test_password),
+            User(username="Bob", hashed_password=test_password),
         ]
         session.add_all(users)
         session.commit()
@@ -111,7 +115,7 @@ def seed_data():
         session.add_all(questions)
         session.commit()
 
-        print("Database seeded with rich dataset!")
+        print("Database seeded with rich dataset (and secure passwords)!")
 
 if __name__ == "__main__":
     seed_data()
