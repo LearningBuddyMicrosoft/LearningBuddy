@@ -157,8 +157,8 @@ else:
 
     # ── resolve questions from session state or fall back to static list ──
     def get_questions():
-        if st.session_state.get("questions"):
-            return st.session_state.questions
+        if st.session_state.get("questions") is not None:
+            return st.session_state["questions"]
         from frontend.pages.questions import questions as static_questions
         return static_questions
 
@@ -182,7 +182,7 @@ else:
         st.subheader("Upload your lecture notes")
 
         uploaded_file = st.file_uploader(
-            "Choose a file",
+            "Choose a PDF file",
             type=["pdf"],
             help="Upload a PDF lecture note to generate quiz questions automatically."
         )
@@ -194,29 +194,45 @@ else:
                 if st.button("🚀 Generate Quiz from PDF", use_container_width=True):
                     from backend.app.pdf_processor import generate_quiz_from_pdf
 
+                    #Reset previous quiz state
+                    st.session_state.questions = None
+                    st.session_state.q_index = 0
+                    reset_quiz()
+
+
                     with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
                         tmp.write(uploaded_file.read())
                         tmp_path = tmp.name
 
-                    with st.spinner("Reading PDF and generating questions with Phi-3.5... this may take a minute."):
-                        generated = generate_quiz_from_pdf(tmp_path, num_questions=10)
+                    with st.spinner("Reading PDF and generating questions..."):
+                        try:
+                            generated = generate_quiz_from_pdf(tmp_path, num_questions=10)
+                        except Exception as e:
+                            st.error(f"Error generating quiz: {e}")
+                            generated = []
 
                     os.unlink(tmp_path)
 
-                    if not generated:
-                        st.error("Could not generate questions from this PDF. Try a different file.")
+                    # Validate
+                    if not generated or len(generated) < 3:  # you can adjust minimum questions
+                        st.error("Could not generate enough valid questions from this PDF.")
                     else:
                         st.session_state.questions = generated
+                        st.session_state.q_index = 0       # RESET INDEX
                         reset_quiz()
                         st.session_state.page = "Quiz"
                         st.rerun()
-            else:
-                if st.button("🚀 Start Quiz (default questions)", use_container_width=True):
-                    st.session_state.questions = None
-                    reset_quiz()
-                    st.session_state.page = "Quiz"
-                    st.rerun()
 
+                        n_generated = len(generated)
+                        if n_generated == 0:
+                            st.error("Could not generate any questions from this PDF. Try a different file or ensure it contains selectable text.")
+                        else:
+                            st.success(f"Generated {n_generated} question{'s' if n_generated > 1 else ''} from the uploaded PDF.")
+                            st.session_state.questions = generated
+                            st.session_state.q_index = 0
+                            reset_quiz()
+                            st.session_state.page = "Quiz"
+                            st.rerun()
         with c2:
             if st.button("📊 View History", use_container_width=True):
                 st.session_state.page = "History"

@@ -29,7 +29,8 @@ You are a quiz generator for university students. Using ONLY the study text belo
 Now generate one question from this text:
 {chunk[:1000]}
 
-Respond in EXACTLY this format:
+Respond ONLY in plain text using EXACTLY this format. No extra words before or after:
+
 Q: [question]
 A) [option]
 B) [option]
@@ -55,7 +56,7 @@ def parse_question(raw: str, source_chunk: str) -> dict:
     for line in lines:
         if line.startswith("Q:"):
             question = line[2:].strip()
-        elif re.match(r"^[A-D]\)", line):
+        elif re.match(r"^[A-D][\)\.]", line):
             options.append(line[3:].strip())
         elif line.startswith("Answer:"):
             answer_letter = line.replace("Answer:", "").strip().upper()

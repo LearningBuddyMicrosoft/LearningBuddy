@@ -43,9 +43,14 @@ def generate_quiz_from_pdf(pdf_path: str, num_questions: int = 10) -> list[dict]
     for chunk in selected:
         try:
             q = generate_question_from_chunk(chunk)
-            if q["q"] and len(q["options"]) == 4 and q["answer"]:
+
+            if q.get("q") and len(q.get("options", [])) == 4 and q.get("answer"):
                 questions.append(q)
-        except Exception:
-            continue  # skip any chunk that fails to parse
+            else:
+                print("⚠️ Skipped invalid question:", q)
+
+        except Exception as e:
+            print("❌ Error generating question:", e)
+            continue
 
     return questions
