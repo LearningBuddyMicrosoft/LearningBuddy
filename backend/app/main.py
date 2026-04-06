@@ -9,7 +9,7 @@ from .security import create_access_token, get_current_user, get_password_hash, 
 from .database import create_db_and_tables, get_session
 from datetime import date
 from .models import Material, Question, Quiz, Response, Subject, Topic, User, QuizAttempt # From your previous steps
-from.schemas import DashboardRead, QuizCreate, SubjectCreate, TopicCreate, TopicDetailedRead, UserCreate, StartAttempt, AnswerSubmission, FinishAttempt, BatchSubmission
+from.schemas import DashboardRead, QuizCreate, QuizRead, SubjectCreate, TopicCreate, TopicDetailedRead, UserCreate, StartAttempt, AnswerSubmission, FinishAttempt, BatchSubmission
 
 app = FastAPI()
 
@@ -69,7 +69,7 @@ def login_user(user_create: UserCreate, session: Session = Depends(get_session))
     access_token = create_access_token(data={"user_id": user.id})
     return {"access_token": access_token, "token_type": "bearer"}
 
-#called everytime a quiz is started
+#called everytime a quiz is started(used to update db with user attempts)
 @app.post("/start-attempt/")
 def start_attempt(payload: StartAttempt, session: Session = Depends(get_session), current_user: User = Depends(get_current_user)):
     quiz = session.get(Quiz, payload.quiz_id)
@@ -126,7 +126,7 @@ def finish_attempt(submission: FinishAttempt, session: Session = Depends(get_ses
 
     # Update the attempt with the final score and feedback
     attempt.score = int(correct_count)
-    #hardcoded overall feedback for now, will be calling AI for this in the future
+    #TODO:hardcoded overall feedback for now, will be calling AI for this in the future
     attempt.feedback = f"You got {attempt.score} correct answers."
 
     quiz = session.get(Quiz, attempt.quiz_id)
@@ -163,7 +163,7 @@ def submit_batch_answers(batch_submission: BatchSubmission, session: Session = D
         else:
             graded_responses.append(question.question_text + ": Incorrect")
         
-    #hardcoded feedback for now, will be calling AI for this in the future
+    #TODO:hardcoded feedback for now, will be calling AI for this in the future
     overall_feedback = f"{score} out of {len(batch_submission.answers)} correct. {'; '.join(graded_responses)}"
 
     new_attempt.score = score
@@ -188,7 +188,7 @@ def grade_and_build_response(submission: AnswerSubmission, current_user_id: int,
     
     is_correct = submission.selected_option == question.correct_answer
 
-    #hardcoded feedback for now, will be calling AI for this in the future
+    #TODO:hardcoded feedback for now, will be calling AI for this in the future
     if is_correct:
         feedback = "Correct!"
     else:
@@ -316,3 +316,14 @@ def generate_quiz(payload:QuizCreate, session: Session = Depends(get_session),cu
     session.refresh(new_quiz)
 
     return new_quiz
+
+#called to display quiz questions when quiz is started(used to display quiz questions)
+@app.get("/quizzes/{quiz_id}/start-quiz", response_model=QuizRead)
+def start_quiz(quiz_id: int, session: Session = Depends(get_session), current_user: User = Depends(get_current_user)):
+    quiz = session.get(Quiz, quiz_id)
+    if not quiz:
+        raise HTTPException(status_code=404, detail="Quiz not found")
+    if quiz.user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="You do not have access to this quiz")
+    quiz.questions
+    return quiz
