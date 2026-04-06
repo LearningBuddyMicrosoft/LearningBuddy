@@ -1,6 +1,8 @@
 from pydantic import BaseModel
 from typing import List
 
+from sqlmodel import SQLModel
+
 class UserCreate(BaseModel):
     username: str
     password: str
@@ -63,3 +65,18 @@ class QuizCreate(BaseModel):
     open_ended: bool
     length: int
     difficulty_level: int # 1-scale
+
+class QuestionRead(SQLModel):
+    id: int
+    question_text: str
+    options: List[str] = []
+    correct_answer: str
+
+class QuizRead(SQLModel):
+    id: int
+    name: str
+    difficulty_level: int
+    open_ended: bool
+    length: int
+    highscore: int
+    questions: List[QuestionRead] = []
