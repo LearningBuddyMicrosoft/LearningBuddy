@@ -1,5 +1,6 @@
+import os
+import tempfile
 import streamlit as st
-from frontend.pages.questions import questions
 from frontend.pages.helpers import initialize_session_state, reset_quiz, submit_quiz
 from frontend.pages.styles import get_theme_colors, apply_custom_css
 
@@ -154,6 +155,13 @@ else:
 
     st.markdown("</div>", unsafe_allow_html=True)
 
+    # ── resolve questions from session state or fall back to static list ──
+    def get_questions():
+        if st.session_state.get("questions") is not None:
+            return st.session_state["questions"]
+        from frontend.pages.questions import questions as static_questions
+        return static_questions
+
     if st.session_state.page == "Home":
         st.markdown(f"""
         <div class="hero-card">
@@ -172,16 +180,59 @@ else:
 
         st.markdown("<div class='content-card'>", unsafe_allow_html=True)
         st.subheader("Upload your lecture notes")
-        st.file_uploader("Choose a file", type=["pdf", "docx", "txt", "pptx"])
+
+        uploaded_file = st.file_uploader(
+            "Choose a PDF file",
+            type=["pdf"],
+            help="Upload a PDF lecture note to generate quiz questions automatically."
+        )
 
         c1, c2, _ = st.columns([1.1, 1.1, 3])
 
         with c1:
-            if st.button("🚀 Start New Quiz", use_container_width=True):
-                reset_quiz()
-                st.session_state.page = "Quiz"
-                st.rerun()
+            if uploaded_file is not None:
+                if st.button("🚀 Generate Quiz from PDF", use_container_width=True):
+                    from backend.app.pdf_processor import generate_quiz_from_pdf
 
+                    #Reset previous quiz state
+                    st.session_state.questions = None
+                    st.session_state.q_index = 0
+                    reset_quiz()
+
+
+                    with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
+                        tmp.write(uploaded_file.read())
+                        tmp_path = tmp.name
+
+                    with st.spinner("Reading PDF and generating questions..."):
+                        try:
+                            generated = generate_quiz_from_pdf(tmp_path, num_questions=10)
+                        except Exception as e:
+                            st.error(f"Error generating quiz: {e}")
+                            generated = []
+
+                    os.unlink(tmp_path)
+
+                    # Validate
+                    if not generated or len(generated) < 3:  # you can adjust minimum questions
+                        st.error("Could not generate enough valid questions from this PDF.")
+                    else:
+                        st.session_state.questions = generated
+                        st.session_state.q_index = 0       # RESET INDEX
+                        reset_quiz()
+                        st.session_state.page = "Quiz"
+                        st.rerun()
+
+                        n_generated = len(generated)
+                        if n_generated == 0:
+                            st.error("Could not generate any questions from this PDF. Try a different file or ensure it contains selectable text.")
+                        else:
+                            st.success(f"Generated {n_generated} question{'s' if n_generated > 1 else ''} from the uploaded PDF.")
+                            st.session_state.questions = generated
+                            st.session_state.q_index = 0
+                            reset_quiz()
+                            st.session_state.page = "Quiz"
+                            st.rerun()
         with c2:
             if st.button("📊 View History", use_container_width=True):
                 st.session_state.page = "History"
@@ -190,8 +241,22 @@ else:
         st.markdown("</div>", unsafe_allow_html=True)
 
     elif st.session_state.page == "Quiz":
+        questions = get_questions()
+
+        if not questions:
+            st.warning("No questions loaded. Please upload a PDF or use the default quiz.")
+            if st.button("🏠 Go Home"):
+                st.session_state.page = "Home"
+                st.rerun()
+            st.stop()
+
         q_index = st.session_state.q_index
         total_q = len(questions)
+
+        if q_index >= total_q:
+            st.session_state.q_index = 0
+            q_index = 0
+
         q = questions[q_index]
 
         st.markdown(f"""
@@ -210,10 +275,15 @@ else:
 
         current_answer = st.session_state.selected_answers.get(q_index, None)
 
+        # Safe index lookup — strips both sides before comparing
+        clean_options = [o.strip() for o in q["options"]]
+        clean_current = current_answer.strip() if current_answer else None
+        safe_index = clean_options.index(clean_current) if clean_current in clean_options else 0
+
         selected = st.radio(
             q["q"],
-            q["options"],
-            index=q["options"].index(current_answer) if current_answer in q["options"] else 0,
+            clean_options,
+            index=safe_index,
             key=f"question_radio_{q_index}"
         )
 
@@ -264,6 +334,8 @@ else:
         st.markdown("</div>", unsafe_allow_html=True)
 
     elif st.session_state.page == "Review":
+        questions = get_questions()
+
         st.markdown(f"""
         <div class="hero-card">
             <h1>✅ Quiz Review</h1>
@@ -293,8 +365,8 @@ else:
                 continue
 
             user_answer = st.session_state.selected_answers.get(i, "No answer selected")
-            correct_answer = q["answer"]
-            is_correct = user_answer == correct_answer
+            correct_answer = q["answer"].strip()
+            is_correct = user_answer.strip() == correct_answer
             is_flagged = i in st.session_state.flagged_questions
 
             box_class = "review-correct" if is_correct else "review-wrong"
@@ -304,6 +376,12 @@ else:
             st.markdown(f"**Your Answer:** {user_answer}")
             st.markdown(f"**Correct Answer:** {correct_answer}")
             st.markdown(f"**Result:** {'✅ Correct' if is_correct else '❌ Incorrect'}")
+
+            if q.get("explanation"):
+                st.markdown(f"**Why:** {q['explanation']}")
+
+            if q.get("source"):
+                st.caption(f"Source: {q['source']}")
 
             if is_flagged:
                 st.markdown(
@@ -329,6 +407,8 @@ else:
         st.markdown("</div>", unsafe_allow_html=True)
 
     elif st.session_state.page == "Flagged":
+        questions = get_questions()
+
         st.markdown(f"""
         <div class="hero-card">
             <h1>🚩 Flagged Questions</h1>
@@ -350,7 +430,7 @@ else:
                 <div class="review-flagged">
                     <strong>Q{i+1}. {q['q']}</strong><br>
                     <strong>Your Current Answer:</strong> {user_answer}<br>
-                    <strong>Correct Answer:</strong> {q['answer']}
+                    <strong>Correct Answer:</strong> {q['answer'].strip()}
                 </div>
                 """, unsafe_allow_html=True)
 
