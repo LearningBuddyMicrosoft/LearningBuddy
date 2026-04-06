@@ -56,3 +56,10 @@ class SubjectCreate(BaseModel):
 class TopicCreate(BaseModel):
     name: str
     subject_id: int
+
+class QuizCreate(BaseModel):
+    name: str
+    topic_ids: list[int]
+    open_ended: bool
+    length: int
+    difficulty_level: int # 1-scale

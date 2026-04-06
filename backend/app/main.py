@@ -9,7 +9,7 @@ from .security import create_access_token, get_current_user, get_password_hash, 
 from .database import create_db_and_tables, get_session
 from datetime import date
 from .models import Material, Question, Quiz, Response, Subject, Topic, User, QuizAttempt # From your previous steps
-from.schemas import DashboardRead, SubjectCreate, TopicCreate, TopicDetailedRead, UserCreate, StartAttempt, AnswerSubmission, FinishAttempt, BatchSubmission
+from.schemas import DashboardRead, QuizCreate, SubjectCreate, TopicCreate, TopicDetailedRead, UserCreate, StartAttempt, AnswerSubmission, FinishAttempt, BatchSubmission
 
 app = FastAPI()
 
@@ -204,7 +204,6 @@ def grade_and_build_response(submission: AnswerSubmission, current_user_id: int,
         )
     return response
 
-#start here later
 @app.get("/dashboard", response_model=DashboardRead)
 def get_user_dashboard(current_user: User = Depends(get_current_user), session: Session = Depends(get_session)):
     return current_user
@@ -268,3 +267,52 @@ def add_material(topic_id: int = Form(...), file: UploadFile = File(...), sessio
     session.commit()
     session.refresh(new_material)
     return new_material
+
+@app.post("/quizzes/generate")
+def generate_quiz(payload:QuizCreate, session: Session = Depends(get_session),current_user: User = Depends(get_current_user)):
+    verified_topics = []
+    for topic_id in payload.topic_ids:
+        topic = session.get(Topic, topic_id)
+        if not topic:
+            raise HTTPException(status_code=404, detail=f"Topic with ID {topic_id} not found")
+        if topic.subject.user_id != current_user.id:
+            raise HTTPException(status_code=403, detail=f"You do not have access to topic with ID {topic_id}")
+        verified_topics.append(topic)
+    if payload.difficulty_level == 1:
+        min_diff, max_diff = 1, 3
+    elif payload.difficulty_level == 2:
+        min_diff, max_diff = 4, 7
+    elif payload.difficulty_level == 3:
+        min_diff, max_diff = 8, 10
+    else:
+        raise HTTPException(status_code=400, detail="Invalid difficulty level")
+    
+    statement = select(Question).where(
+        Question.topic_id.in_(payload.topic_ids),
+        Question.difficulty >= min_diff,
+        Question.difficulty <= max_diff
+    ).order_by(func.random()).limit(payload.length)
+    
+    selected_questions = session.exec(statement).all()
+
+    if len(selected_questions) < payload.length:
+         raise HTTPException(
+             status_code=400, 
+             detail=f"Not enough {payload.difficulty_level} questions in the bank. Please upload more materials!"
+         )
+    
+    new_quiz = Quiz(
+        topics =verified_topics,
+        user_id=current_user.id,
+        name=payload.name,
+        difficulty_level =payload.difficulty_level,
+        open_ended=payload.open_ended,
+        length=payload.length,
+        questions=selected_questions
+    )
+
+    session.add(new_quiz)
+    session.commit()
+    session.refresh(new_quiz)
+
+    return new_quiz
