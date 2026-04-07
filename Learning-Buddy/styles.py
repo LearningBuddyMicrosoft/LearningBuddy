@@ -234,12 +234,13 @@ def apply_custom_css(colors):
         background: {colors["shell_button"]};
         color: white;
         font-weight: 600;
-        padding: 0.65rem 0.8rem;
+        padding: 12px 16px;
         font-size: 0.93rem;
         transition: all 0.25s ease;
         box-shadow: 0 4px 10px rgba(0,0,0,0.10);
         cursor: pointer;
     }}
+
 
     div.stButton > button:hover {{
         transform: translateY(-2px);

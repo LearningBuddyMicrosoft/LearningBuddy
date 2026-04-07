@@ -24,7 +24,6 @@ def initialize_session_state():
         if key not in st.session_state:
             st.session_state[key] = value
 
-
 def reset_quiz():
     st.session_state.q_index = 0
     st.session_state.score = 0
@@ -43,6 +42,11 @@ def calculate_score(questions):
 
 
 def submit_quiz(questions):
+    wrong_questions = []
+    for i, q in enumerate(questions):
+        user_answer = st.session_state.selected_answers.get(i)
+        if user_answer != q["answer"]:
+         wrong_questions.append(q["q"])
     score = calculate_score(questions)
     st.session_state.score = score
     st.session_state.quiz_submitted = True
@@ -55,7 +59,8 @@ def submit_quiz(questions):
         "total": len(questions),
         "percentage": round((score / len(questions)) * 100),
         "timestamp": timestamp,
-        "flagged_count": len(st.session_state.flagged_questions)
+        "flagged_count": len(st.session_state.flagged_questions),
+        "wrong_questions":wrong_questions
     }
 
     st.session_state.quiz_history.insert(0, history_entry)
