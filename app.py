@@ -214,7 +214,7 @@ else:
                     os.unlink(tmp_path)
 
                     # Validate
-                    if not generated or len(generated) < 3:  # you can adjust minimum questions
+                    if not generated:  # you can adjust minimum questions
                         st.error("Could not generate enough valid questions from this PDF.")
                     else:
                         st.session_state.questions = generated
