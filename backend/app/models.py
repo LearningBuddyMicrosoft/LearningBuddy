@@ -55,6 +55,7 @@ class Quiz(SQLModel, table=True):
     attempts: List["QuizAttempt"] = Relationship(back_populates="quiz")
 
     name: str
+    difficulty_level: int
     open_ended: bool = Field(default=False) #Indicates if the quiz allows open-ended responses
     length: int = Field(default=10) #number of questions
     highscore: int = Field(default=0) #highest score achieved on this quiz
