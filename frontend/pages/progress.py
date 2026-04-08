@@ -79,12 +79,20 @@ def show_progress():
             max_score = last
             st.info("Only one attempt recorded.")
 
-        if last> max_score:
-            st.markdown(f"<h1 style='font-size:50px; color:green;'>NEW HIGH SCORE! {last}%</h1>", unsafe_allow_html=True)
+        if last > max_score:
+            st.markdown(
+                f'<div style="color:green; font-size:50px; font-weight:bold;">NEW HIGH SCORE! {last}%</div>',
+                unsafe_allow_html=True
+            )
         else:
-            st.markdown(f"<h1 style='font-size:30px; color:blue;'>Current Score: {last}%</h1>", unsafe_allow_html=True)
-            st.markdown(f"<h2 style='font-size:20px; color:orange;'>High Score: {max_score}% Can you beat it?</h2>", unsafe_allow_html=True)
-
+            st.markdown(
+                f'<div style="color:blue; font-size:30px;">Current Score: {last}%</div>',
+                unsafe_allow_html=True
+            )
+            st.markdown(
+                f'<div style="color:orange; font-size:20px;">High Score: {max_score}%</div>',
+                unsafe_allow_html=True
+            )
         history = st.session_state.get("quiz_history", [])
         if history:
             last_attempt = history[0]  # newest attempt is at index 0

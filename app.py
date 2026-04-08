@@ -154,7 +154,7 @@ else:
         if st.button("👤 Profile", use_container_width=True):
             st.session_state.page = "Profile"
     with nav6:
-        if st.button("Progress",use_container_width=True):
+        if st.button("📈 Progress",use_container_width=True):
             st.session_state.page = "Progress"
 
     st.markdown("</div>", unsafe_allow_html=True)
