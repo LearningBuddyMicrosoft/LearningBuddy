@@ -1,9 +1,5 @@
 import streamlit as st
 import plotly.graph_objects as go
-<<<<<<< HEAD
-=======
-
->>>>>>> 0534570d8910f469039c79b27cb03e00fd6c0c7a
 def show_progress():
     
     history=st.session_state.get("quiz_history",[])
@@ -14,23 +10,32 @@ def show_progress():
 
     attempt_numbers=list(range(1,len(history)+1))
     percentages=[attempt["percentage"] for attempt in history]
-
     percentages.reverse()
     fig = go.Figure()
+    theme = st.session_state.get("theme", "Dark") 
+    if theme=="Light":
+        line=dict(color='navy', width=5)
+        marker=dict(size=10, color='black')
+    else:
+        line=dict(color='#ADD8E6', width=5)
+        marker=dict(size=10, color='white')
+   
     fig.add_trace(go.Scatter(
         x=attempt_numbers,
         y=percentages,
         mode='lines+markers',
-        line=dict(color='navy', width=5),
-        marker=dict(size=10, color='black'),
+        line=line,
+        marker=marker,
         hovertemplate='Attempt %{x}: %{y}%<extra></extra>'
     ))
 
-    fig.update_layout(
-        title=dict(
+    
+
+    if theme=="Light":
+        title = dict(
             text="Quiz Progress",
             font=dict(color="black", size=24)
-        ),
+        )
         xaxis=dict(
             title=dict(
                 text="Attempts",
@@ -38,7 +43,7 @@ def show_progress():
             ),
             tickfont=dict(color="grey", size=14),
             dtick=1
-        ),
+        )
         yaxis=dict(
             title=dict(
                 font=dict(color="navy", size=18)
@@ -46,13 +51,38 @@ def show_progress():
             tickfont=dict(color="grey", size=14),
             range=[0, 100],
             dtick=10
-    ),
+    )
+    else:
+        title = dict(
+            text="Quiz Progress",
+            font=dict(color="#e5ecf6", size=24)
+        )
+        xaxis = dict(
+            title=dict(
+                text="Attempts",
+                font=dict(color="#e5ecf6", size=18)
+            ),
+            tickfont=dict(color="#94a3b8", size=14),
+            dtick=1
+        )
+        yaxis = dict(
+            title=dict(
+                font=dict(color="#e5ecf6", size=18)
+            ),
+            tickfont=dict(color="#94a3b8", size=14),
+            range=[0, 100],
+            dtick=10
+        )
+    fig.update_layout(
+        title=title,
+        xaxis=xaxis,
+        yaxis=yaxis,
         width=600,
         height=400,
         template="simple_white",
         paper_bgcolor='rgba(0,0,0,0)',
         plot_bgcolor='rgba(0,0,0,0)'
-    )
+)
     current_index=-1
     fig.add_annotation(
     x=attempt_numbers[current_index],
@@ -101,12 +131,12 @@ def show_progress():
         if history:
             last_attempt = history[0]  # newest attempt is at index 0
             wrong_questions = last_attempt.get("wrong_questions", [])
+            with st.expander("**Suggested Next Topics**", expanded=False):
 
-            if wrong_questions:
-                st.markdown("### *Suggested Next Topics*")
-                for q in wrong_questions:
-                    st.markdown(f"- {q}")
-            else:
-                st.markdown("🎉 All correct! No suggested topics.")
+                if wrong_questions:
+                    for q in wrong_questions:
+                        st.markdown(f"- {q}")
+                else:
+                    st.markdown("🎉 All correct! No suggested topics.")
         else:
             st.info("No quiz attempts yet.")
