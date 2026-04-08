@@ -3,6 +3,7 @@ import tempfile
 import streamlit as st
 from frontend.pages.helpers import initialize_session_state, reset_quiz, submit_quiz
 from frontend.pages.styles import get_theme_colors, apply_custom_css
+from frontend.pages.progress import show_progress
 
 st.set_page_config(
     page_title="Learning Buddy",
@@ -11,7 +12,6 @@ st.set_page_config(
 )
 
 initialize_session_state()
-
 colors = get_theme_colors(st.session_state.theme)
 apply_custom_css(colors)
 
@@ -36,6 +36,7 @@ if not st.session_state.authenticated:
         with c2:
             b1, b2 = st.columns(2)
 
+            
             with b1:
                 if st.button("🔐 Login", use_container_width=True):
                     st.session_state.auth_page = "Login"
@@ -131,7 +132,7 @@ if not st.session_state.authenticated:
 else:
     st.markdown("<div class='main-navbar'>", unsafe_allow_html=True)
 
-    nav1, nav2, nav3, nav4, nav5 = st.columns(5)
+    nav1, nav2, nav3, nav4, nav5, nav6 = st.columns(6)
 
     with nav1:
         if st.button("🏠 Home", use_container_width=True):
@@ -152,6 +153,9 @@ else:
     with nav5:
         if st.button("👤 Profile", use_container_width=True):
             st.session_state.page = "Profile"
+    with nav6:
+        if st.button("Progress",use_container_width=True):
+            st.session_state.page = "Progress"
 
     st.markdown("</div>", unsafe_allow_html=True)
 
@@ -375,8 +379,8 @@ else:
             st.markdown(f"**Q{i+1}. {q['q']}**")
             st.markdown(f"**Your Answer:** {user_answer}")
             st.markdown(f"**Correct Answer:** {correct_answer}")
-            st.markdown(f"**Result:** {'✅ Correct' if is_correct else '❌ Incorrect'}")
-
+            st.markdown(f"**Result:** {'✅ Correct' if is_correct else '❌ Incorrect' }")
+                
             if q.get("explanation"):
                 st.markdown(f"**Why:** {q['explanation']}")
 
@@ -460,7 +464,6 @@ else:
         """, unsafe_allow_html=True)
 
         st.markdown("<div class='content-card'>", unsafe_allow_html=True)
-
         if not st.session_state.quiz_history:
             st.info("No quiz attempts yet. Complete a quiz and your history will appear here.")
         else:
@@ -513,6 +516,8 @@ else:
                 st.rerun()
 
         st.markdown("</div>", unsafe_allow_html=True)
+    elif st.session_state.page=="Progress":
+        show_progress()
 
 st.markdown("""
 <div class="footer-fixed">
