@@ -1,5 +1,9 @@
 import streamlit as st
 import plotly.graph_objects as go
+<<<<<<< HEAD
+=======
+
+>>>>>>> 0534570d8910f469039c79b27cb03e00fd6c0c7a
 def show_progress():
     
     history=st.session_state.get("quiz_history",[])

@@ -10,7 +10,7 @@ def initialize_session_state():
         "username": "",
         "users": {},
         "auth_mode": "Login",
-        "theme": "Light",
+        "theme": "Dark",
         "q_index": 0,
         "score": 0,
         "selected_answers": {},
