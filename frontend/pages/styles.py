@@ -278,6 +278,14 @@ def apply_custom_css(colors):
         background: linear-gradient(90deg, {colors["accent_2"]}, {colors["accent"]});
     }}
 
+    body, h1, h2, h3, h4, h5, h6, p, span, label, div {{
+    color: {colors["text_color"]} !important;
+}}
+    div.stButton > button {{
+    color: white !important;
+    -webkit-text-fill-color: white !important;
+    }}
+
     @media (max-width: 768px) {{
         .hero-card, .content-card, .quiz-card, .auth-shell {{
             padding: 0.9rem;
