@@ -24,12 +24,16 @@ if not st.session_state.authenticated:
         #             <div class="auth-badge">📘 Learning Buddy</div>
         #             """, unsafe_allow_html=True)
         st.markdown("""
-        <div style='margin-top: 70px;'>""", unsafe_allow_html=True)
-        st.image("logo.png", width=1000) 
+        <div style='margin-top: 70px;'>              
+                <h2 style="margin-bottom:0.35rem; text-align:center">Welcome</h2>
+                """, unsafe_allow_html=True)
+        col1, col2, col3 = st.columns([1, 2, 1]) 
+        with col2:
+            st.image("logo.png", width=800) 
+
         st.markdown("""
                   <div class="auth-shell">
                   <div class="auth-top">
-                    <h2 style="margin-bottom:0.35rem;">Welcome</h2>
                     <p class="subtle">
                         A smart and simple quiz platform to help you learn, review answers,
                         track progress, and revisit flagged questions.
@@ -40,7 +44,7 @@ if not st.session_state.authenticated:
         """, unsafe_allow_html=True)
 
         c1, c2, c3 = st.columns([1, 1.2, 1])
-
+        st.markdown('<div class="auth-buttons">', unsafe_allow_html=True)
         with c2:
             b1, spacer, b2 = st.columns([3,2,3])
             with b1:
@@ -54,7 +58,7 @@ if not st.session_state.authenticated:
                     st.session_state.auth_page = "Sign Up"
                     st.session_state.auth_mode = "Sign Up"
                     st.rerun()
-
+        st.markdown('</div>', unsafe_allow_html=True)
     elif st.session_state.auth_page == "Login":
         st.markdown("""
         <div class="auth-shell">
