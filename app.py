@@ -27,34 +27,32 @@ if not st.session_state.authenticated:
         <div style='margin-top: 70px;'>              
                 <h2 style="margin-bottom:0.35rem; text-align:center">Welcome</h2>
                 """, unsafe_allow_html=True)
-        col1, col2, col3 = st.columns([1, 2, 1]) 
+        col1, col2, col3 = st.columns([1, 4, 1]) 
         with col2:
             st.image("logo.png", width=800) 
 
         st.markdown("""
-                  <div class="auth-shell">
                   <div class="auth-top">
                     <p class="subtle">
                         A smart and simple quiz platform to help you learn, review answers,
                         track progress, and revisit flagged questions.
                     </p>
                 </div>
-            </div>
         <div style='margin-top: 30px;'>
         """, unsafe_allow_html=True)
 
         c1, c2, c3 = st.columns([1, 1.2, 1])
         st.markdown('<div class="auth-buttons">', unsafe_allow_html=True)
         with c2:
-            b1, spacer, b2 = st.columns([3,2,3])
+            b1, spacer, b2 = st.columns([3,0.1,3])
             with b1:
-                if st.button("🔐 Login", use_container_width=True):
+                if st.button("Login", use_container_width=True):
                     st.session_state.auth_page = "Login"
                     st.session_state.auth_mode = "Login"
                     st.rerun()
 
             with b2:
-                if st.button("✨ Sign Up", use_container_width=True):
+                if st.button("Sign Up", use_container_width=True):
                     st.session_state.auth_page = "Sign Up"
                     st.session_state.auth_mode = "Sign Up"
                     st.rerun()

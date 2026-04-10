@@ -146,6 +146,7 @@ def apply_custom_css(colors):
     .auth-shell {{
         max-width: 1000px;
         height:50px;
+        margin: 12vh auto 0 auto;
         background: {colors["card_bg_2"]};
         border-radius: 22px;
         padding: 1.4rem;
@@ -155,14 +156,10 @@ def apply_custom_css(colors):
     .sign{{
         height:400px;
         background:#205a56;
-
-   .auth-buttons button {{
-    background: #205a56 !important;
-    color: white !important;
-    width:100% !important;
     }}
 
-    }}
+
+    
     .auth-top {{
         text-align: center;
         margin-bottom: 0.8rem;
