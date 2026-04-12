@@ -5,9 +5,13 @@ from frontend.pages.helpers import initialize_session_state, reset_quiz, submit_
 from frontend.pages.styles import get_theme_colors, apply_custom_css
 from frontend.pages.progress import show_progress
 
+# AI modules
+from ai.llm import llm, parser
+from ai.Chunking import extract_structural_units, semantic_refine_units, Chunk, RawUnit
+
 st.set_page_config(
     page_title="Learning Buddy",
-    page_icon="📘",
+    ##page_icon="",
     layout="wide"
 )
 
@@ -21,7 +25,7 @@ if not st.session_state.authenticated:
         st.markdown("""
         <div class="auth-shell">
             <div class="auth-top">
-                <div class="auth-badge">📘 Learning Buddy</div>
+                <div class="auth-badge"> Learning Buddy</div>
                 <h1 style="margin-bottom:0.35rem;">Welcome</h1>
                 <p class="subtle">
                     A smart and simple quiz platform to help you learn, review answers,
@@ -38,13 +42,13 @@ if not st.session_state.authenticated:
 
             
             with b1:
-                if st.button("🔐 Login", use_container_width=True):
+                if st.button(" Login", use_container_width=True):
                     st.session_state.auth_page = "Login"
                     st.session_state.auth_mode = "Login"
                     st.rerun()
 
             with b2:
-                if st.button("✨ Sign Up", use_container_width=True):
+                if st.button(" Sign Up", use_container_width=True):
                     st.session_state.auth_page = "Sign Up"
                     st.session_state.auth_mode = "Sign Up"
                     st.rerun()
@@ -53,7 +57,7 @@ if not st.session_state.authenticated:
         st.markdown("""
         <div class="auth-shell">
             <div class="auth-top">
-                <div class="auth-badge">📘 Learning Buddy</div>
+                <div class="auth-badge"> Learning Buddy</div>
                 <h1 style="margin-bottom:0.25rem;">Login</h1>
                 <p class="subtle">Enter your account details to continue.</p>
             </div>
@@ -68,12 +72,12 @@ if not st.session_state.authenticated:
         c1, c2 = st.columns(2)
 
         with c1:
-            if st.button("⬅ Back", use_container_width=True):
+            if st.button(" Back", use_container_width=True):
                 st.session_state.auth_page = "Landing"
                 st.rerun()
 
         with c2:
-            if st.button("➡️ Login", use_container_width=True):
+            if st.button(" Login", use_container_width=True):
                 if not username.strip() or not password.strip():
                     st.warning("Please enter both username and password.")
                 elif username in st.session_state.users and st.session_state.users[username] == password:
@@ -93,7 +97,7 @@ if not st.session_state.authenticated:
         st.markdown("""
         <div class="auth-shell">
             <div class="auth-top">
-                <div class="auth-badge">📘 Learning Buddy</div>
+                <div class="auth-badge"> Learning Buddy</div>
                 <h1 style="margin-bottom:0.25rem;">Create Account</h1>
                 <p class="subtle">Sign up to start using Learning Buddy.</p>
             </div>
@@ -114,7 +118,7 @@ if not st.session_state.authenticated:
                 st.rerun()
 
         with c2:
-            if st.button("🚀 Create Account", use_container_width=True):
+            if st.button(" Create Account", use_container_width=True):
                 if not username.strip() or not password.strip() or not confirm_password.strip():
                     st.warning("Please complete all fields.")
                 elif password != confirm_password:
@@ -132,30 +136,33 @@ if not st.session_state.authenticated:
 else:
     st.markdown("<div class='main-navbar'>", unsafe_allow_html=True)
 
-    nav1, nav2, nav3, nav4, nav5, nav6 = st.columns(6)
+    nav1, nav2, nav3, nav4, nav5, nav6, nav7 = st.columns(7)
 
     with nav1:
-        if st.button("🏠 Home", use_container_width=True):
+        if st.button(" Home", use_container_width=True):
             st.session_state.page = "Home"
 
     with nav2:
-        if st.button("📝 Quiz", use_container_width=True):
+        if st.button(" Quiz", use_container_width=True):
             st.session_state.page = "Quiz"
 
     with nav3:
-        if st.button("🚩 Flagged", use_container_width=True):
+        if st.button(" Flagged", use_container_width=True):
             st.session_state.page = "Flagged"
 
     with nav4:
-        if st.button("📊 History", use_container_width=True):
+        if st.button(" History", use_container_width=True):
             st.session_state.page = "History"
 
     with nav5:
-        if st.button("👤 Profile", use_container_width=True):
+        if st.button(" Profile", use_container_width=True):
             st.session_state.page = "Profile"
     with nav6:
         if st.button("Progress",use_container_width=True):
             st.session_state.page = "Progress"
+    with nav7:
+        if st.button(" Hallucination", use_container_width=True):
+            st.session_state.page = "Hallucinations"
 
     st.markdown("</div>", unsafe_allow_html=True)
 
@@ -167,9 +174,10 @@ else:
         return static_questions
 
     if st.session_state.page == "Home":
+
         st.markdown(f"""
         <div class="hero-card">
-            <h1>📘 Learning Buddy</h1>
+            <h1> Learning Buddy</h1>
             <h3 style="color:{colors["sub_text"]}; font-weight:500;">
                 Welcome, {st.session_state.username}
             </h3>
@@ -195,7 +203,7 @@ else:
 
         with c1:
             if uploaded_file is not None:
-                if st.button("🚀 Generate Quiz from PDF", use_container_width=True):
+                if st.button(" Generate Quiz from PDF", use_container_width=True):
                     from backend.app.pdf_processor import generate_quiz_from_pdf
 
                     #Reset previous quiz state
@@ -238,7 +246,7 @@ else:
                             st.session_state.page = "Quiz"
                             st.rerun()
         with c2:
-            if st.button("📊 View History", use_container_width=True):
+            if st.button(" View History", use_container_width=True):
                 st.session_state.page = "History"
                 st.rerun()
 
@@ -249,7 +257,7 @@ else:
 
         if not questions:
             st.warning("No questions loaded. Please upload a PDF or use the default quiz.")
-            if st.button("🏠 Go Home"):
+            if st.button(" Go Home"):
                 st.session_state.page = "Home"
                 st.rerun()
             st.stop()
@@ -297,7 +305,7 @@ else:
 
         with top_left:
             is_flagged = q_index in st.session_state.flagged_questions
-            if st.button("🚩 Unflag" if is_flagged else "🚩 Flag", use_container_width=True):
+            if st.button(" Unflag" if is_flagged else " Flag", use_container_width=True):
                 if is_flagged:
                     st.session_state.flagged_questions.remove(q_index)
                 else:
@@ -321,17 +329,17 @@ else:
                     st.session_state.q_index += 1
                     st.rerun()
             else:
-                if st.button("✅ Submit Quiz", use_container_width=True):
+                if st.button(" Submit Quiz", use_container_width=True):
                     submit_quiz(questions)
                     st.rerun()
 
         with nav_mid2:
-            if st.button("📋 Review Now", use_container_width=True):
+            if st.button(" Review Now", use_container_width=True):
                 submit_quiz(questions)
                 st.rerun()
 
         with nav_right:
-            if st.button("❌ Exit Quiz", use_container_width=True):
+            if st.button(" Exit Quiz", use_container_width=True):
                 st.session_state.page = "Home"
                 st.rerun()
 
@@ -342,7 +350,7 @@ else:
 
         st.markdown(f"""
         <div class="hero-card">
-            <h1>✅ Quiz Review</h1>
+            <h1> Quiz Review</h1>
             <p class="subtle">Review your performance question by question.</p>
             <span class="stats-pill">Score: {st.session_state.score}/{len(questions)}</span>
             <span class="stats-pill">Percentage: {round((st.session_state.score / len(questions)) * 100)}%</span>
@@ -353,12 +361,12 @@ else:
         r1, r2, _ = st.columns([1.1, 1.1, 3])
 
         with r1:
-            if st.button("📄 Show All", use_container_width=True):
+            if st.button(" Show All", use_container_width=True):
                 st.session_state.review_mode = "All"
                 st.rerun()
 
         with r2:
-            if st.button("🚩 Show Flagged", use_container_width=True):
+            if st.button(" Show Flagged", use_container_width=True):
                 st.session_state.review_mode = "Flagged"
                 st.rerun()
 
@@ -389,7 +397,7 @@ else:
 
             if is_flagged:
                 st.markdown(
-                    "<div class='review-flagged'><strong>🚩 Flagged:</strong> You marked this question for review.</div>",
+                    "<div class='review-flagged'><strong> Flagged:</strong> You marked this question for review.</div>",
                     unsafe_allow_html=True
                 )
 
@@ -398,13 +406,13 @@ else:
         c1, c2, _ = st.columns([1.1, 1.1, 3])
 
         with c1:
-            if st.button("🔁 Retake Quiz", use_container_width=True):
+            if st.button(" Retake Quiz", use_container_width=True):
                 reset_quiz()
                 st.session_state.page = "Quiz"
                 st.rerun()
 
         with c2:
-            if st.button("🏠 Go Home", use_container_width=True):
+            if st.button(" Go Home", use_container_width=True):
                 st.session_state.page = "Home"
                 st.rerun()
 
@@ -415,7 +423,7 @@ else:
 
         st.markdown(f"""
         <div class="hero-card">
-            <h1>🚩 Flagged Questions</h1>
+            <h1> Flagged Questions</h1>
             <p class="subtle">View all the questions you marked as uncertain.</p>
             <span class="stats-pill">{len(st.session_state.flagged_questions)} Currently Flagged</span>
         </div>
@@ -441,14 +449,14 @@ else:
             c1, c2, _ = st.columns([1.1, 1.1, 3])
 
             with c1:
-                if st.button("📝 Return to Quiz", use_container_width=True):
+                if st.button(" Return to Quiz", use_container_width=True):
                     first_flagged = sorted(st.session_state.flagged_questions)[0]
                     st.session_state.q_index = first_flagged
                     st.session_state.page = "Quiz"
                     st.rerun()
 
             with c2:
-                if st.button("🧹 Clear Flags", use_container_width=True):
+                if st.button(" Clear Flags", use_container_width=True):
                     st.session_state.flagged_questions = set()
                     st.rerun()
 
@@ -457,7 +465,7 @@ else:
     elif st.session_state.page == "History":
         st.markdown(f"""
         <div class="hero-card">
-            <h1>📊 History</h1>
+            <h1> History</h1>
             <p class="subtle">Review your previous quiz attempts, scores, and timestamps.</p>
             <span class="stats-pill">{len(st.session_state.quiz_history)} Attempts</span>
         </div>
@@ -503,12 +511,12 @@ else:
         c1, c2, _ = st.columns([1.1, 1.1, 3])
 
         with c1:
-            if st.button("🌙 Toggle Dark Mode", use_container_width=True):
+            if st.button(" Toggle Dark Mode", use_container_width=True):
                 st.session_state.theme = "Dark" if st.session_state.theme == "Light" else "Light"
                 st.rerun()
 
         with c2:
-            if st.button("🚪 Logout", use_container_width=True):
+            if st.button(" Logout", use_container_width=True):
                 st.session_state.authenticated = False
                 st.session_state.username = ""
                 st.session_state.page = "AuthLanding"
@@ -519,8 +527,67 @@ else:
     elif st.session_state.page=="Progress":
         show_progress()
 
-st.markdown("""
-<div class="footer-fixed">
-    Learning Buddy © 2026
-</div>
-""", unsafe_allow_html=True)
+    elif st.session_state.page == "Hallucinations":
+        st.markdown("""
+        <div class="hero-card">
+            <h1> Hallucination Checker</h1>
+            <p class="subtle">This page automatically evaluates the hallucination rate of the generated quiz questions.</p>
+        </div>
+        """, unsafe_allow_html=True)
+
+        st.markdown("<div class='content-card'>", unsafe_allow_html=True)
+        st.write("The score is calculated from the generated quiz questions and their source context. A lower score means the output is more grounded.")
+        st.write("Questions with a score above 0.5 are automatically excluded from the generated quiz.")
+
+        pdf_questions = st.session_state.get("questions")
+        if not pdf_questions:
+            st.info("No generated PDF quiz is available yet. Upload a PDF and generate a quiz to compute hallucination rates automatically.")
+        else:
+            question_scores = [q.get("hallucination_score") for q in pdf_questions if q.get("hallucination_score") is not None]
+            if not question_scores:
+                st.warning("No hallucination scores are available for the current quiz.")
+            else:
+                average_score = sum(question_scores) / len(question_scores)
+                severity = "Low" if average_score < 0.3 else "Medium" if average_score < 0.7 else "High"
+                color = "#2ECC71" if severity == "Low" else "#F1C40F" if severity == "Medium" else "#E74C3C"
+
+                st.markdown(f"<div style='padding:1rem; background:{color}; color:#111; border-radius:12px; margin-top:1rem;'>Latest severity: <strong>{severity}</strong></div>", unsafe_allow_html=True)
+                st.metric("Hallucination score", f"{average_score:.2f} / 1.00", delta=f"{severity}")
+
+                import plotly.graph_objects as go
+                fig = go.Figure()
+                fig.add_trace(go.Scatter(
+                    x=list(range(1, len(question_scores) + 1)),
+                    y=question_scores,
+                    mode="lines+markers",
+                    line=dict(color="#ADD8E6", width=4),
+                    marker=dict(color="white", size=10),
+                    hovertemplate="Question %{x}: %{y:.2f}<extra></extra>"
+                ))
+                fig.update_layout(
+                    title=dict(text="Hallucination score by question", font=dict(color="#ADD8E6", size=20)),
+                    xaxis=dict(title="Question #", tickmode="linear", tick0=1, dtick=1),
+                    yaxis=dict(title="Score", range=[0, 1]),
+                    paper_bgcolor="rgba(0,0,0,0)",
+                    plot_bgcolor="rgba(0,0,0,0)"
+                )
+                st.plotly_chart(fig, use_container_width=True)
+
+                st.markdown("---")
+                st.subheader("Question details")
+                for idx, q in enumerate(pdf_questions, start=1):
+                    score = q.get("hallucination_score")
+                    if score is None:
+                        continue
+                    status = "Low" if score < 0.3 else "Medium" if score < 0.7 else "High"
+                    st.markdown(f"**Q{idx}.** {q['q']}  —  Score: {score:.2f} ({status})")
+                    with st.expander("View source context", expanded=False):
+                        st.write(q.get("source", "No source text available."))
+
+        st.markdown("</div>", unsafe_allow_html=True)
+
+    st.markdown("""
+    <div class="footer-fixed">
+        Learning Buddy © 2026
+    </div>
+    """, unsafe_allow_html=True)
