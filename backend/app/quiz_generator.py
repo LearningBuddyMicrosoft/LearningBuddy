@@ -57,7 +57,10 @@ def parse_question(raw: str, source_chunk: str) -> dict:
         if line.startswith("Q:"):
             question = line[2:].strip()
         elif re.match(r"^[A-D][\)\.]", line):
-            options.append(line[3:].strip())
+            # Remove all leading prefixes like "A) " or "A. " to handle LLM duplication
+            option_text = re.sub(r"^[A-D][\)\.]\s*", "", line).strip()
+            option_text = re.sub(r"^[A-D][\)\.]\s*", "", option_text).strip()
+            options.append(option_text)
         elif line.startswith("Answer:"):
             answer_letter = line.replace("Answer:", "").strip().upper()
         elif line.startswith("Explanation:"):
@@ -71,5 +74,5 @@ def parse_question(raw: str, source_chunk: str) -> dict:
         "options": options,
         "answer": answer_text,
         "explanation": explanation,
-        "source": source_chunk[:200]
+        "source": source_chunk
     }

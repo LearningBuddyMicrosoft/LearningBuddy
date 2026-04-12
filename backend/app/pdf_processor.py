@@ -1,83 +1,104 @@
-import fitz  # PyMuPDF
-import time
-from langchain_core.documents import Document
-from langchain_text_splitters import RecursiveCharacterTextSplitter
-
-
+import fitz
 from .quiz_generator import generate_question_from_chunk
+import os
+from typing import List
+import hashlib
+from ai.hallucination import calculate_hallucination_score
 
-def chunk_by_slide(file_path: str) -> list[str]:
-    print(f"\nReading {file_path}...")
-    start_time = time.time()
-    documents = []
-    
-    try:
-        doc = fitz.open(file_path)
-        for page_num, page in enumerate(doc):
-            text = page.get_text().strip()
-            
-            if text: 
-                metadata = {
-                    "page_number": page_num + 1,
-                    "source": file_path
-                }
-                documents.append(Document(page_content=text, metadata=metadata))
-        
-        doc.close()
-                
-    except Exception as e:
-        print(f"Error opening PDF: {e}")
-        return []
 
-    print(f"PDF read and extracted in {time.time() - start_time:.2f} seconds.")
-    
-    split_start = time.time()
-    safety_splitter = RecursiveCharacterTextSplitter(
-        chunk_size=3000,
-        chunk_overlap=200,
-        length_function=len,
-        separators=["\n\n", "\n", " ", ""] 
-    )
-    
-    final_chunks = safety_splitter.split_documents(documents)
-    print(f"Text split by LangChain in {time.time() - split_start:.2f} seconds.")
-    
-    string_chunks = []
-    for chunk in final_chunks:
-        slide_num = chunk.metadata.get("page_number", "Unknown")
-        formatted_text = f"--- SLIDE {slide_num} ---\n{chunk.page_content}\n"
-        string_chunks.append(formatted_text)
-        
-    return string_chunks
+# Simple cache for processed PDFs
+_pdf_cache = {}
+
+
+def _get_pdf_hash(pdf_path: str) -> str:
+    """Get hash of PDF file for caching."""
+    with open(pdf_path, 'rb') as f:
+        return hashlib.md5(f.read()).hexdigest()
+
+
+def smart_chunk_by_headers(pdf_path: str) -> list[str]:
+    """Optimized PDF chunking using PyMuPDF's built-in text extraction."""
+    cache_key = _get_pdf_hash(pdf_path)
+
+    if cache_key in _pdf_cache:
+        return _pdf_cache[cache_key]
+
+    document = fitz.open(pdf_path)
+    chunks = []
+
+    # Use PyMuPDF's more efficient text extraction
+    for page in document:
+        # Get text with structure preservation but simpler processing
+        text = page.get_text("text")
+        if not text.strip():
+            continue
+
+        # Split by paragraphs (double newlines) more efficiently
+        paragraphs = [p.strip() for p in text.split('\n\n') if p.strip()]
+
+        for para in paragraphs:
+            if len(para) > 50:  # Filter out very short fragments
+                chunks.append(para)
+
+    # Cache the result
+    _pdf_cache[cache_key] = chunks
+    return chunks
 
 
 def generate_quiz_from_pdf(pdf_path: str, num_questions: int = 10) -> list[dict]:
-    overall_start = time.time()
-    chunks = chunk_by_slide(pdf_path)
+    """Generate quiz questions from PDF with optimized chunking."""
+    chunks = smart_chunk_by_headers(pdf_path)
 
-    step = max(1, len(chunks) // num_questions) if chunks else 1
-    selected = chunks[::step][:num_questions]
+    if not chunks:
+        return []
+
+    # Filter chunks to ensure quality content
+    filtered_chunks = [chunk for chunk in chunks if len(chunk.split()) > 20]  # At least 20 words
+
+    if len(filtered_chunks) < num_questions:
+        # If we don't have enough quality chunks, use what we have
+        selected_chunks = filtered_chunks
+    else:
+        # Select chunks more intelligently - prefer middle sections and avoid very short chunks
+        step = max(1, len(filtered_chunks) // num_questions)
+        selected_chunks = filtered_chunks[::step][:num_questions]
+
+    # If some generated questions are filtered out for hallucination,
+    # continue evaluating additional chunks until we have enough questions.
+    candidate_chunks = selected_chunks[:]
+    if len(selected_chunks) < len(filtered_chunks):
+        candidate_chunks.extend([chunk for chunk in filtered_chunks if chunk not in selected_chunks])
 
     questions = []
-    print(f"\nStarting question generation for {len(selected)} chunks...")
-    
-    for i, chunk in enumerate(selected):
-        chunk_start = time.time()
-        print(f"Generating question {i+1}/{len(selected)}... (Chunk length: {len(chunk)} chars)")
-        
+    hallucination_threshold = 0.5
+    for chunk in candidate_chunks:
+        if len(questions) >= num_questions:
+            break
+
         try:
+            # Limit chunk size to avoid LLM token limits and improve speed
+            if len(chunk) > 2000:  # ~500-600 tokens
+                chunk = chunk[:2000] + "..."
+
             q = generate_question_from_chunk(chunk)
 
             if q.get("q") and len(q.get("options", [])) == 4 and q.get("answer"):
+                response = q["q"] + " " + " ".join(q["options"])
+                context = [{"text": chunk}]
+                score = calculate_hallucination_score(response, context)
+                q["hallucination_score"] = score
+                q["hallucination_context"] = chunk
+
+                if score > hallucination_threshold:
+                    print(f"⚠️ Skipped hallucinating question (score: {score:.2f}): {q['q'][:100]}...")
+                    continue
+
                 questions.append(q)
             else:
-                print("Skipped invalid question")
+                print(f"⚠️ Skipped invalid question from chunk: {chunk[:100]}...")
 
         except Exception as e:
-            print("Error generating question:", e)
+            print(f"⚠️ Error generating question from chunk: {str(e)}")
             continue
-            
-        print(f"Question {i+1} finished in {time.time() - chunk_start:.2f} seconds.")
 
-    print(f"\nTotal process took {time.time() - overall_start:.2f} seconds.")
     return questions
