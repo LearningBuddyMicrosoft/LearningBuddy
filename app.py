@@ -3,6 +3,7 @@ import tempfile
 import streamlit as st
 from frontend.pages.helpers import initialize_session_state, reset_quiz, submit_quiz
 from frontend.pages.styles import get_theme_colors, apply_custom_css
+from frontend.pages.progress import show_progress
 
 st.set_page_config(
     page_title="Learning Buddy",
@@ -11,147 +12,168 @@ st.set_page_config(
 )
 
 initialize_session_state()
-
 colors = get_theme_colors(st.session_state.theme)
 apply_custom_css(colors)
 
 if not st.session_state.authenticated:
 
     if st.session_state.auth_page == "Landing":
+        # st.markdown("""
+        #     <div class="auth-shell">
+        #         <div class="auth-top">
+        #             <div class="auth-badge">📘 Learning Buddy</div>
+        #             """, unsafe_allow_html=True)
         st.markdown("""
-        <div class="auth-shell">
-            <div class="auth-top">
-                <div class="auth-badge">📘 Learning Buddy</div>
-                <h1 style="margin-bottom:0.35rem;">Welcome</h1>
-                <p class="subtle">
-                    A smart and simple quiz platform to help you learn, review answers,
-                    track progress, and revisit flagged questions.
-                </p>
-            </div>
-        </div>
+        <div style='margin-top: 70px;'>              
+                <h2 style="margin-bottom:0.35rem; text-align:center">Welcome</h2>
+                """, unsafe_allow_html=True)
+        col1, col2, col3 = st.columns([1, 4, 1]) 
+        with col2:
+            st.image("logo2.png", width=800) 
+
+        st.markdown("""
+                  <div class="auth-top">
+                    <p class="subtle">
+                        A smart and simple quiz platform to help you learn, review answers,
+                        track progress, and revisit flagged questions.
+                    </p>
+                </div>
+        <div style='margin-top: 30px;'>
         """, unsafe_allow_html=True)
 
         c1, c2, c3 = st.columns([1, 1.2, 1])
-
+        st.markdown('<div class="auth-buttons">', unsafe_allow_html=True)
         with c2:
-            b1, b2 = st.columns(2)
-
+            b1, spacer, b2 = st.columns([3,0.1,3])
             with b1:
-                if st.button("🔐 Login", use_container_width=True):
+                if st.button("Login", use_container_width=True):
                     st.session_state.auth_page = "Login"
                     st.session_state.auth_mode = "Login"
                     st.rerun()
 
             with b2:
-                if st.button("✨ Sign Up", use_container_width=True):
+                if st.button("Sign Up", use_container_width=True):
                     st.session_state.auth_page = "Sign Up"
                     st.session_state.auth_mode = "Sign Up"
                     st.rerun()
-
+        st.markdown('</div>', unsafe_allow_html=True)
     elif st.session_state.auth_page == "Login":
-        st.markdown("""
-        <div class="auth-shell">
-            <div class="auth-top">
-                <div class="auth-badge">📘 Learning Buddy</div>
-                <h1 style="margin-bottom:0.25rem;">Login</h1>
-                <p class="subtle">Enter your account details to continue.</p>
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
+        col1,col2=st.columns(2)
+        with col1:
+                    st.markdown("""
+                    <div class="auth-shell sign">
+                        <div class="auth-top">
+                            <div class="auth-badge">📘 Learning Buddy</div>
+                            <h1 style="margin-bottom:0.25rem;">Login</h1>
+                            <p class="subtle">Sign up to start using Learning Buddy.</p>
+                        </div>
+                    </div>
+                    """, unsafe_allow_html=True)
+        with col2:
+                    st.markdown("<div style='margin-top: 100px;'>", unsafe_allow_html=True)
 
-        st.markdown("<div class='auth-shell'>", unsafe_allow_html=True)
+                    username = st.text_input("Username", placeholder="Enter your username")
+                    password = st.text_input("Password", type="password", placeholder="Enter your password")
+                    st.markdown("<div style='margin-top: 150px;'>", unsafe_allow_html=True)
 
-        username = st.text_input("Username", placeholder="Enter your username")
-        password = st.text_input("Password", type="password", placeholder="Enter your password")
+                    c1, c2 = st.columns(2)
 
-        c1, c2 = st.columns(2)
+                    with c1:
+                        if st.button("⬅ Back", use_container_width=True):
+                            st.session_state.auth_page = "Landing"
+                            st.rerun()
 
-        with c1:
-            if st.button("⬅ Back", use_container_width=True):
-                st.session_state.auth_page = "Landing"
-                st.rerun()
-
-        with c2:
-            if st.button("➡️ Login", use_container_width=True):
-                if not username.strip() or not password.strip():
-                    st.warning("Please enter both username and password.")
-                elif username in st.session_state.users and st.session_state.users[username] == password:
-                    st.session_state.username = username
-                    st.session_state.authenticated = True
-                    st.session_state.page = "Home"
-                    reset_quiz()
-                    st.rerun()
-                elif username not in st.session_state.users:
-                    st.error("Account not found. Please sign up first.")
-                else:
-                    st.error("Incorrect password.")
+                    with c2:
+                        if st.button(" Login", use_container_width=True):
+                            if not username.strip() or not password.strip():
+                                st.warning("Please enter both username and password.")
+                            elif username in st.session_state.users and st.session_state.users[username] == password:
+                                st.session_state.username = username
+                                st.session_state.authenticated = True
+                                st.session_state.page = "Home"
+                                reset_quiz()
+                                st.rerun()
+                            elif username not in st.session_state.users:
+                                st.error("Account not found. Please sign up first.")
+                            else:
+                                st.error("Incorrect password.")
 
         st.markdown("</div>", unsafe_allow_html=True)
 
     elif st.session_state.auth_page == "Sign Up":
-        st.markdown("""
-        <div class="auth-shell">
-            <div class="auth-top">
-                <div class="auth-badge">📘 Learning Buddy</div>
-                <h1 style="margin-bottom:0.25rem;">Create Account</h1>
-                <p class="subtle">Sign up to start using Learning Buddy.</p>
+        col1,col2=st.columns(2)
+        with col1:
+            st.markdown("""
+            <div class="auth-shell sign">
+                <div class="auth-top">
+                    <div class="auth-badge"> Learning Buddy</div>
+                    <h1 style="margin-bottom:0.25rem;">Create Account</h1>
+                    <p class="subtle">Sign up to start using Learning Buddy.</p>
+                </div>
             </div>
-        </div>
-        """, unsafe_allow_html=True)
+            """, unsafe_allow_html=True)
+            
+        with col2:
+            st.markdown("<div style='margin-top: 100px;'>", unsafe_allow_html=True)
 
-        st.markdown("<div class='auth-shell'>", unsafe_allow_html=True)
+            username = st.text_input("Username", placeholder="Choose a username")
+            password = st.text_input("Password", type="password", placeholder="Create a password")
+            confirm_password = st.text_input("Confirm Password", type="password", placeholder="Re-enter your password")
+            st.markdown("<div style='margin-top: 30px;'>", unsafe_allow_html=True)
 
-        username = st.text_input("Username", placeholder="Choose a username")
-        password = st.text_input("Password", type="password", placeholder="Create a password")
-        confirm_password = st.text_input("Confirm Password", type="password", placeholder="Re-enter your password")
+            c1, c2 = st.columns(2)
 
-        c1, c2 = st.columns(2)
-
-        with c1:
-            if st.button("⬅ Back", use_container_width=True):
-                st.session_state.auth_page = "Landing"
-                st.rerun()
-
-        with c2:
-            if st.button("🚀 Create Account", use_container_width=True):
-                if not username.strip() or not password.strip() or not confirm_password.strip():
-                    st.warning("Please complete all fields.")
-                elif password != confirm_password:
-                    st.error("Passwords do not match.")
-                elif username in st.session_state.users:
-                    st.error("That username already exists. Please log in instead.")
-                else:
-                    st.session_state.users[username] = password
-                    st.session_state.username = username
-                    st.session_state.authenticated = True
-                    st.session_state.page = "Home"
-                    reset_quiz()
+            with c1:
+                if st.button("⬅ Back", use_container_width=True):
+                    st.session_state.auth_page = "Landing"
                     st.rerun()
+
+            with c2:
+
+                if st.button(" Create Account", use_container_width=True):
+                    if not username.strip() or not password.strip() or not confirm_password.strip():
+                        st.warning("Please complete all fields.")
+                    elif len(password)<8:
+                        st.error("Password must be at least 8 characters.")
+                    elif password != confirm_password:
+                        st.error("Passwords do not match.")
+                    elif username in st.session_state.users:
+                        st.error("That username already exists. Please log in instead.")
+                    else:
+                        st.session_state.users[username] = password
+                        st.session_state.username = username
+                        st.session_state.authenticated = True
+                        st.session_state.page = "Home"
+                        reset_quiz()
+                        st.rerun()
 
 else:
     st.markdown("<div class='main-navbar'>", unsafe_allow_html=True)
 
-    nav1, nav2, nav3, nav4, nav5 = st.columns(5)
+    nav1, nav2, nav3, nav4, nav5, nav6 = st.columns(6)
 
     with nav1:
-        if st.button("🏠 Home", use_container_width=True):
+        if st.button("Home", use_container_width=True):
             st.session_state.page = "Home"
 
     with nav2:
-        if st.button("📝 Quiz", use_container_width=True):
+        if st.button("Quiz", use_container_width=True):
             st.session_state.page = "Quiz"
 
     with nav3:
-        if st.button("🚩 Flagged", use_container_width=True):
+        if st.button("Flagged", use_container_width=True):
             st.session_state.page = "Flagged"
 
     with nav4:
-        if st.button("📊 History", use_container_width=True):
+        if st.button("History", use_container_width=True):
             st.session_state.page = "History"
 
     with nav5:
-        if st.button("👤 Profile", use_container_width=True):
+        if st.button("Profile", use_container_width=True):
             st.session_state.page = "Profile"
+    with nav6:
+        if st.button("Progress",use_container_width=True):
+            st.session_state.page = "Progress"
 
     st.markdown("</div>", unsafe_allow_html=True)
 
@@ -163,9 +185,12 @@ else:
         return static_questions
 
     if st.session_state.page == "Home":
+        col1, col2, col3 = st.columns([1, 1, 1])
+        with col2:
+            st.image("logo2.png", width=350) 
+
         st.markdown(f"""
         <div class="hero-card">
-            <h1>📘 Learning Buddy</h1>
             <h3 style="color:{colors["sub_text"]}; font-weight:500;">
                 Welcome, {st.session_state.username}
             </h3>
@@ -178,7 +203,6 @@ else:
         </div>
         """, unsafe_allow_html=True)
 
-        st.markdown("<div class='content-card'>", unsafe_allow_html=True)
         st.subheader("Upload your lecture notes")
         quiz_title = st.text_input(
             "Quiz title",
@@ -205,10 +229,8 @@ else:
             help="Upload a PDF lecture note to generate quiz questions automatically."
         )
 
-        c1, c2, _ = st.columns([1.1, 1.1, 3])
-
-        with c1:
-            if uploaded_file is not None:
+       
+        if uploaded_file is not None:
                 if st.button("🚀 Generate Quiz from PDF", use_container_width=True):
                     from backend.app.pdf_processor import generate_quiz_from_pdf
 
@@ -236,7 +258,7 @@ else:
                     os.unlink(tmp_path)
 
                     # Validate
-                    if not generated or len(generated) < 3:  # you can adjust minimum questions
+                    if not generated:  # you can adjust minimum questions
                         st.error("Could not generate enough valid questions from this PDF.")
                     else:
                         st.session_state.questions = generated
@@ -255,14 +277,15 @@ else:
                             reset_quiz()
                             st.session_state.page = "Quiz"
                             st.rerun()
-        with c2:
-            if st.button("📊 View History", use_container_width=True):
-                st.session_state.page = "History"
-                st.rerun()
+ 
 
         st.markdown("</div>", unsafe_allow_html=True)
 
     elif st.session_state.page == "Quiz":
+        col1, col2, col3 = st.columns([1, 1, 1])
+        with col2:
+             st.image("logo2.png", width=350) 
+
         questions = get_questions()
 
         if not questions:
@@ -344,7 +367,7 @@ else:
                     st.rerun()
 
         with nav_mid2:
-            if st.button("📋 Review Now", use_container_width=True):
+            if st.button("Review Now", use_container_width=True):
                 submit_quiz(questions)
                 st.rerun()
 
@@ -370,7 +393,7 @@ else:
 
         st.markdown(f"""
         <div class="hero-card">
-            <h1>✅ Quiz Review</h1>
+            <h1>Quiz Review</h1>
             <p class="subtle">Review your performance question by question.</p>
             <span class="stats-pill">Score: {review_score}/{len(questions)}</span>
             <span class="stats-pill">Percentage: {round((review_score / len(questions)) * 100)}%</span>
@@ -381,7 +404,7 @@ else:
         r1, r2, _ = st.columns([1.1, 1.1, 3])
 
         with r1:
-            if st.button("📄 Show All", use_container_width=True):
+            if st.button("Show All", use_container_width=True):
                 st.session_state.review_mode = "All"
                 st.rerun()
 
@@ -407,8 +430,8 @@ else:
             st.markdown(f"**Q{i+1}. {q['q']}**")
             st.markdown(f"**Your Answer:** {user_answer}")
             st.markdown(f"**Correct Answer:** {correct_answer}")
-            st.markdown(f"**Result:** {'✅ Correct' if is_correct else '❌ Incorrect'}")
-
+            st.markdown(f"**Result:** {'✅ Correct' if is_correct else '❌ Incorrect' }")
+                
             if q.get("explanation"):
                 st.markdown(f"**Why:** {q['explanation']}")
 
@@ -442,6 +465,9 @@ else:
         st.markdown("</div>", unsafe_allow_html=True)
 
     elif st.session_state.page == "Flagged":
+        col1, col2, col3 = st.columns([1, 1, 1])
+        with col2:
+             st.image("logo2.png", width=350) 
         questions = get_questions()
 
         st.markdown(f"""
@@ -472,20 +498,23 @@ else:
             c1, c2, _ = st.columns([1.1, 1.1, 3])
 
             with c1:
-                if st.button("📝 Return to Quiz", use_container_width=True):
+                if st.button("Return to Quiz", use_container_width=True):
                     first_flagged = sorted(st.session_state.flagged_questions)[0]
                     st.session_state.q_index = first_flagged
                     st.session_state.page = "Quiz"
                     st.rerun()
 
             with c2:
-                if st.button("🧹 Clear Flags", use_container_width=True):
+                if st.button("Clear Flags", use_container_width=True):
                     st.session_state.flagged_questions = set()
                     st.rerun()
 
         st.markdown("</div>", unsafe_allow_html=True)
 
     elif st.session_state.page == "History":
+        col1, col2, col3 = st.columns([1, 1, 1])
+        with col2:
+             st.image("logo2.png", width=350) 
         st.markdown(f"""
         <div class="hero-card">
             <h1>📊 History</h1>
@@ -495,7 +524,6 @@ else:
         """, unsafe_allow_html=True)
 
         st.markdown("<div class='content-card'>", unsafe_allow_html=True)
-
         if not st.session_state.quiz_history:
             st.info("No quiz attempts yet. Complete a quiz and your history will appear here.")
         else:
@@ -594,6 +622,9 @@ else:
         st.markdown("</div>", unsafe_allow_html=True)
 
     elif st.session_state.page == "Profile":
+        col1, col2, col3 = st.columns([1, 1, 1])
+        with col2:
+             st.image("logo2.png", width=350) 
         st.markdown("""
         <div class="hero-card">
             <h1>👤 Profile</h1>
@@ -601,7 +632,6 @@ else:
         </div>
         """, unsafe_allow_html=True)
 
-        st.markdown("<div class='content-card'>", unsafe_allow_html=True)
 
         st.write(f"**Username:** {st.session_state.username}")
         st.write(f"**Theme:** {st.session_state.theme}")
@@ -616,7 +646,7 @@ else:
                 st.rerun()
 
         with c2:
-            if st.button("🚪 Logout", use_container_width=True):
+            if st.button("Logout", use_container_width=True):
                 st.session_state.authenticated = False
                 st.session_state.username = ""
                 st.session_state.page = "AuthLanding"
@@ -624,6 +654,11 @@ else:
                 st.rerun()
 
         st.markdown("</div>", unsafe_allow_html=True)
+    elif st.session_state.page=="Progress":
+        col1, col2, col3 = st.columns([1, 1, 1])
+        with col2:
+             st.image("logo2.png", width=350) 
+        show_progress()
 
 st.markdown("""
 <div class="footer-fixed">
