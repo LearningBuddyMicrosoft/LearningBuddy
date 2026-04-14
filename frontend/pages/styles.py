@@ -144,15 +144,22 @@ def apply_custom_css(colors):
     }}
 
     .auth-shell {{
-        max-width: 500px;
-        margin: 6vh auto 0 auto;
+        max-width: 1000px;
+        height:50px;
+        margin: 12vh auto 0 auto;
         background: {colors["card_bg_2"]};
         border-radius: 22px;
         padding: 1.4rem;
         border: 1px solid {colors["border"]};
         box-shadow: 0 14px 32px rgba(0,0,0,0.12);
     }}
+    .sign{{
+        height:400px;
+        background:#205a56;
+    }}
 
+
+    
     .auth-top {{
         text-align: center;
         margin-bottom: 0.8rem;
@@ -228,7 +235,10 @@ def apply_custom_css(colors):
     }}
 
     div.stButton > button {{
-        width: 100%;
+        width:100%;
+        max-width:320px;
+        margin:0 auto;
+        display: block;
         border-radius: 12px;
         border: 1px solid transparent;
         background: {colors["shell_button"]};
