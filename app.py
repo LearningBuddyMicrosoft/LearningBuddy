@@ -180,6 +180,24 @@ else:
 
         st.markdown("<div class='content-card'>", unsafe_allow_html=True)
         st.subheader("Upload your lecture notes")
+        quiz_title = st.text_input(
+            "Quiz title",
+            value=st.session_state.get("current_quiz_title", "Practice Quiz"),
+            placeholder="e.g. Week 3 Revision",
+        )
+        col_meta1, col_meta2 = st.columns(2)
+        with col_meta1:
+            subject_name = st.text_input(
+                "Subject",
+                value=st.session_state.get("current_subject", "Uncategorized"),
+                placeholder="e.g. Machine Learning",
+            )
+        with col_meta2:
+            topic_name = st.text_input(
+                "Topic",
+                value=st.session_state.get("current_topic", "General"),
+                placeholder="e.g. Neural Networks",
+            )
 
         uploaded_file = st.file_uploader(
             "Choose a PDF file",
@@ -193,6 +211,10 @@ else:
             if uploaded_file is not None:
                 if st.button("🚀 Generate Quiz from PDF", use_container_width=True):
                     from backend.app.pdf_processor import generate_quiz_from_pdf
+
+                    st.session_state.current_quiz_title = quiz_title.strip() or "Practice Quiz"
+                    st.session_state.current_subject = subject_name.strip() or "Uncategorized"
+                    st.session_state.current_topic = topic_name.strip() or "General"
 
                     #Reset previous quiz state
                     st.session_state.questions = None
@@ -334,15 +356,25 @@ else:
         st.markdown("</div>", unsafe_allow_html=True)
 
     elif st.session_state.page == "Review":
-        questions = get_questions()
+        review_attempt = st.session_state.get("history_review")
+        if review_attempt:
+            questions = review_attempt["questions"]
+            selected_answers = review_attempt["selected_answers"]
+            flagged_questions = set(review_attempt["flagged_questions"])
+            review_score = review_attempt["score"]
+        else:
+            questions = get_questions()
+            selected_answers = st.session_state.selected_answers
+            flagged_questions = st.session_state.flagged_questions
+            review_score = st.session_state.score
 
         st.markdown(f"""
         <div class="hero-card">
             <h1>✅ Quiz Review</h1>
             <p class="subtle">Review your performance question by question.</p>
-            <span class="stats-pill">Score: {st.session_state.score}/{len(questions)}</span>
-            <span class="stats-pill">Percentage: {round((st.session_state.score / len(questions)) * 100)}%</span>
-            <span class="stats-pill">Flagged: {len(st.session_state.flagged_questions)}</span>
+            <span class="stats-pill">Score: {review_score}/{len(questions)}</span>
+            <span class="stats-pill">Percentage: {round((review_score / len(questions)) * 100)}%</span>
+            <span class="stats-pill">Flagged: {len(flagged_questions)}</span>
         </div>
         """, unsafe_allow_html=True)
 
@@ -361,13 +393,13 @@ else:
         st.markdown("<div class='content-card'>", unsafe_allow_html=True)
 
         for i, q in enumerate(questions):
-            if st.session_state.review_mode == "Flagged" and i not in st.session_state.flagged_questions:
+            if st.session_state.review_mode == "Flagged" and i not in flagged_questions:
                 continue
 
-            user_answer = st.session_state.selected_answers.get(i, "No answer selected")
+            user_answer = selected_answers.get(i, "No answer selected")
             correct_answer = q["answer"].strip()
             is_correct = user_answer.strip() == correct_answer
-            is_flagged = i in st.session_state.flagged_questions
+            is_flagged = i in flagged_questions
 
             box_class = "review-correct" if is_correct else "review-wrong"
 
@@ -395,12 +427,15 @@ else:
 
         with c1:
             if st.button("🔁 Retake Quiz", use_container_width=True):
+                if review_attempt:
+                    st.session_state.questions = review_attempt["questions"]
                 reset_quiz()
                 st.session_state.page = "Quiz"
                 st.rerun()
 
         with c2:
             if st.button("🏠 Go Home", use_container_width=True):
+                st.session_state.history_review = None
                 st.session_state.page = "Home"
                 st.rerun()
 
@@ -454,7 +489,7 @@ else:
         st.markdown(f"""
         <div class="hero-card">
             <h1>📊 History</h1>
-            <p class="subtle">Review your previous quiz attempts, scores, and timestamps.</p>
+            <p class="subtle">Review your previous quiz attempts, scores, and reopen any quiz for review or retake.</p>
             <span class="stats-pill">{len(st.session_state.quiz_history)} Attempts</span>
         </div>
         """, unsafe_allow_html=True)
@@ -464,7 +499,67 @@ else:
         if not st.session_state.quiz_history:
             st.info("No quiz attempts yet. Complete a quiz and your history will appear here.")
         else:
-            for idx, attempt in enumerate(st.session_state.quiz_history, start=1):
+            subjects = sorted({attempt.get("subject", "Uncategorized") for attempt in st.session_state.quiz_history})
+            topics = sorted({attempt.get("topic", "General") for attempt in st.session_state.quiz_history})
+
+            filter_col1, filter_col2, filter_col3 = st.columns(3)
+            with filter_col1:
+                selected_subject = st.selectbox(
+                    "Filter by subject",
+                    ["All"] + subjects,
+                    key="history_subject_filter",
+                )
+            with filter_col2:
+                selected_topic = st.selectbox(
+                    "Filter by topic",
+                    ["All"] + topics,
+                    key="history_topic_filter",
+                )
+            with filter_col3:
+                sort_mode = st.selectbox(
+                    "Sort attempts",
+                    ["Newest first", "Subject (A-Z)", "Topic (A-Z)", "Highest score"],
+                    key="history_sort_mode",
+                )
+
+            filtered_history = [
+                attempt for attempt in st.session_state.quiz_history
+                if (selected_subject == "All" or attempt.get("subject", "Uncategorized") == selected_subject)
+                and (selected_topic == "All" or attempt.get("topic", "General") == selected_topic)
+            ]
+
+            if sort_mode == "Subject (A-Z)":
+                filtered_history = sorted(
+                    filtered_history,
+                    key=lambda attempt: (
+                        attempt.get("subject", "Uncategorized").lower(),
+                        attempt.get("topic", "General").lower(),
+                        attempt.get("timestamp", ""),
+                    ),
+                )
+            elif sort_mode == "Topic (A-Z)":
+                filtered_history = sorted(
+                    filtered_history,
+                    key=lambda attempt: (
+                        attempt.get("topic", "General").lower(),
+                        attempt.get("subject", "Uncategorized").lower(),
+                        attempt.get("timestamp", ""),
+                    ),
+                )
+            elif sort_mode == "Highest score":
+                filtered_history = sorted(
+                    filtered_history,
+                    key=lambda attempt: (
+                        attempt.get("percentage", 0),
+                        attempt.get("score", 0),
+                    ),
+                    reverse=True,
+                )
+
+            if not filtered_history:
+                st.info("No quiz attempts match the current subject/topic filter.")
+
+            for idx, attempt in enumerate(filtered_history, start=1):
                 st.markdown(f"""
                 <div style="
                     background:{colors["option_bg"]};
@@ -472,13 +567,29 @@ else:
                     border-radius:14px;
                     padding:0.85rem;
                     margin-bottom:0.75rem;">
-                    <strong>Attempt {idx}</strong><br>
+                    <strong>{attempt.get('quiz_title', f'Attempt {idx}')}</strong><br>
+                    <strong>Subject:</strong> {attempt.get('subject', 'Uncategorized')}<br>
+                    <strong>Topic:</strong> {attempt.get('topic', 'General')}<br>
                     <strong>Score:</strong> {attempt['score']} / {attempt['total']}<br>
                     <strong>Percentage:</strong> {attempt['percentage']}%<br>
                     <strong>Completed:</strong> {attempt['timestamp']}<br>
                     <strong>Flagged Questions:</strong> {attempt['flagged_count']}
                 </div>
                 """, unsafe_allow_html=True)
+
+                c1, c2, _ = st.columns([1.1, 1.1, 3])
+                with c1:
+                    if st.button("👀 Review Attempt", key=f"review_attempt_{idx}", use_container_width=True):
+                        st.session_state.history_review = attempt
+                        st.session_state.review_mode = "All"
+                        st.session_state.page = "Review"
+                        st.rerun()
+                with c2:
+                    if st.button("🔁 Retake This Quiz", key=f"retake_attempt_{idx}", use_container_width=True):
+                        st.session_state.questions = attempt["questions"]
+                        reset_quiz()
+                        st.session_state.page = "Quiz"
+                        st.rerun()
 
         st.markdown("</div>", unsafe_allow_html=True)
 

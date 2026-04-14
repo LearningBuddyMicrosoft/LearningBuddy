@@ -1,3 +1,4 @@
+from copy import deepcopy
 from datetime import datetime
 import streamlit as st
 
@@ -17,7 +18,12 @@ def initialize_session_state():
         "flagged_questions": set(),
         "quiz_submitted": False,
         "quiz_history": [],
-        "review_mode": "All"
+        "review_mode": "All",
+        "questions": None,
+        "history_review": None,
+        "current_quiz_title": "Practice Quiz",
+        "current_subject": "Uncategorized",
+        "current_topic": "General",
     }
 
     for key, value in defaults.items():
@@ -32,6 +38,7 @@ def reset_quiz():
     st.session_state.flagged_questions = set()
     st.session_state.quiz_submitted = False
     st.session_state.review_mode = "All"
+    st.session_state.history_review = None
 
 
 def calculate_score(questions):
@@ -51,12 +58,21 @@ def submit_quiz(questions):
 
     history_entry = {
         "username": st.session_state.username,
+        "quiz_title": st.session_state.get("current_quiz_title", "Practice Quiz"),
+        "subject": st.session_state.get("current_subject", "Uncategorized"),
+        "topic": st.session_state.get("current_topic", "General"),
         "score": score,
         "total": len(questions),
         "percentage": round((score / len(questions)) * 100),
         "timestamp": timestamp,
+        "flagged_count": len(st.session_state.flagged_questions),
+        "wrong_questions": wrong_questions,
+        "questions": deepcopy(questions),
+        "selected_answers": dict(st.session_state.selected_answers),
+        "flagged_questions": sorted(st.session_state.flagged_questions),
         "flagged_count": len(st.session_state.flagged_questions)
     }
 
     st.session_state.quiz_history.insert(0, history_entry)
+    st.session_state.history_review = None
     st.session_state.page = "Review"
