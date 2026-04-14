@@ -29,7 +29,7 @@ if not st.session_state.authenticated:
                 """, unsafe_allow_html=True)
         col1, col2, col3 = st.columns([1, 4, 1]) 
         with col2:
-            st.image("logo.png", width=800) 
+            st.image("logo2.png", width=800) 
 
         st.markdown("""
                   <div class="auth-top">
@@ -58,42 +58,45 @@ if not st.session_state.authenticated:
                     st.rerun()
         st.markdown('</div>', unsafe_allow_html=True)
     elif st.session_state.auth_page == "Login":
-        st.markdown("""
-        <div class="auth-shell">
-            <div class="auth-top">
-                <div class="auth-badge">📘 Learning Buddy</div>
-                <h1 style="margin-bottom:0.25rem;">Login</h1>
-                <p class="subtle">Enter your account details to continue.</p>
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
+        col1,col2=st.columns(2)
+        with col1:
+                    st.markdown("""
+                    <div class="auth-shell sign">
+                        <div class="auth-top">
+                            <div class="auth-badge">📘 Learning Buddy</div>
+                            <h1 style="margin-bottom:0.25rem;">Login</h1>
+                            <p class="subtle">Sign up to start using Learning Buddy.</p>
+                        </div>
+                    </div>
+                    """, unsafe_allow_html=True)
+        with col2:
+                    st.markdown("<div style='margin-top: 100px;'>", unsafe_allow_html=True)
 
-        st.markdown("<div class='auth-shell'>", unsafe_allow_html=True)
+                    username = st.text_input("Username", placeholder="Enter your username")
+                    password = st.text_input("Password", type="password", placeholder="Enter your password")
+                    st.markdown("<div style='margin-top: 150px;'>", unsafe_allow_html=True)
 
-        username = st.text_input("Username", placeholder="Enter your username")
-        password = st.text_input("Password", type="password", placeholder="Enter your password")
+                    c1, c2 = st.columns(2)
 
-        c1, c2 = st.columns(2)
+                    with c1:
+                        if st.button("⬅ Back", use_container_width=True):
+                            st.session_state.auth_page = "Landing"
+                            st.rerun()
 
-        with c1:
-            if st.button("⬅ Back", use_container_width=True):
-                st.session_state.auth_page = "Landing"
-                st.rerun()
-
-        with c2:
-            if st.button("➡️ Login", use_container_width=True):
-                if not username.strip() or not password.strip():
-                    st.warning("Please enter both username and password.")
-                elif username in st.session_state.users and st.session_state.users[username] == password:
-                    st.session_state.username = username
-                    st.session_state.authenticated = True
-                    st.session_state.page = "Home"
-                    reset_quiz()
-                    st.rerun()
-                elif username not in st.session_state.users:
-                    st.error("Account not found. Please sign up first.")
-                else:
-                    st.error("Incorrect password.")
+                    with c2:
+                        if st.button(" Login", use_container_width=True):
+                            if not username.strip() or not password.strip():
+                                st.warning("Please enter both username and password.")
+                            elif username in st.session_state.users and st.session_state.users[username] == password:
+                                st.session_state.username = username
+                                st.session_state.authenticated = True
+                                st.session_state.page = "Home"
+                                reset_quiz()
+                                st.rerun()
+                            elif username not in st.session_state.users:
+                                st.error("Account not found. Please sign up first.")
+                            else:
+                                st.error("Incorrect password.")
 
         st.markdown("</div>", unsafe_allow_html=True)
 
@@ -103,7 +106,7 @@ if not st.session_state.authenticated:
             st.markdown("""
             <div class="auth-shell sign">
                 <div class="auth-top">
-                    <div class="auth-badge">📘 Learning Buddy</div>
+                    <div class="auth-badge"> Learning Buddy</div>
                     <h1 style="margin-bottom:0.25rem;">Create Account</h1>
                     <p class="subtle">Sign up to start using Learning Buddy.</p>
                 </div>
@@ -111,28 +114,27 @@ if not st.session_state.authenticated:
             """, unsafe_allow_html=True)
             
         with col2:
-            st.markdown("<div style='margin-top: 150px;'>", unsafe_allow_html=True)
+            st.markdown("<div style='margin-top: 100px;'>", unsafe_allow_html=True)
 
             username = st.text_input("Username", placeholder="Choose a username")
             password = st.text_input("Password", type="password", placeholder="Create a password")
             confirm_password = st.text_input("Confirm Password", type="password", placeholder="Re-enter your password")
+            st.markdown("<div style='margin-top: 30px;'>", unsafe_allow_html=True)
 
             c1, c2 = st.columns(2)
 
             with c1:
-                st.markdown("<div style='margin-top: 50px;'>", unsafe_allow_html=True)
                 if st.button("⬅ Back", use_container_width=True):
                     st.session_state.auth_page = "Landing"
                     st.rerun()
 
             with c2:
-                st.markdown("<div style='margin-top: 50px;'>", unsafe_allow_html=True)
 
-                if st.button("🚀 Create Account", use_container_width=True):
+                if st.button(" Create Account", use_container_width=True):
                     if not username.strip() or not password.strip() or not confirm_password.strip():
                         st.warning("Please complete all fields.")
-                    if len(password)<8:
-                        st.error("Password too short.Must be 8 characters or more.")
+                    elif len(password)<8:
+                        st.error("Password must be at least 8 characters.")
                     elif password != confirm_password:
                         st.error("Passwords do not match.")
                     elif username in st.session_state.users:
@@ -151,26 +153,26 @@ else:
     nav1, nav2, nav3, nav4, nav5, nav6 = st.columns(6)
 
     with nav1:
-        if st.button("🏠 Home", use_container_width=True):
+        if st.button("Home", use_container_width=True):
             st.session_state.page = "Home"
 
     with nav2:
-        if st.button("📝 Quiz", use_container_width=True):
+        if st.button("Quiz", use_container_width=True):
             st.session_state.page = "Quiz"
 
     with nav3:
-        if st.button("🚩 Flagged", use_container_width=True):
+        if st.button("Flagged", use_container_width=True):
             st.session_state.page = "Flagged"
 
     with nav4:
-        if st.button("📊 History", use_container_width=True):
+        if st.button("History", use_container_width=True):
             st.session_state.page = "History"
 
     with nav5:
-        if st.button("👤 Profile", use_container_width=True):
+        if st.button("Profile", use_container_width=True):
             st.session_state.page = "Profile"
     with nav6:
-        if st.button("📈 Progress",use_container_width=True):
+        if st.button("Progress",use_container_width=True):
             st.session_state.page = "Progress"
 
     st.markdown("</div>", unsafe_allow_html=True)
@@ -254,7 +256,7 @@ else:
                             st.session_state.page = "Quiz"
                             st.rerun()
         with c2:
-            if st.button("📊 View History", use_container_width=True):
+            if st.button("View History", use_container_width=True):
                 st.session_state.page = "History"
                 st.rerun()
 
@@ -342,7 +344,7 @@ else:
                     st.rerun()
 
         with nav_mid2:
-            if st.button("📋 Review Now", use_container_width=True):
+            if st.button("Review Now", use_container_width=True):
                 submit_quiz(questions)
                 st.rerun()
 
@@ -358,7 +360,7 @@ else:
 
         st.markdown(f"""
         <div class="hero-card">
-            <h1>✅ Quiz Review</h1>
+            <h1>Quiz Review</h1>
             <p class="subtle">Review your performance question by question.</p>
             <span class="stats-pill">Score: {st.session_state.score}/{len(questions)}</span>
             <span class="stats-pill">Percentage: {round((st.session_state.score / len(questions)) * 100)}%</span>
@@ -369,7 +371,7 @@ else:
         r1, r2, _ = st.columns([1.1, 1.1, 3])
 
         with r1:
-            if st.button("📄 Show All", use_container_width=True):
+            if st.button("Show All", use_container_width=True):
                 st.session_state.review_mode = "All"
                 st.rerun()
 
@@ -414,13 +416,13 @@ else:
         c1, c2, _ = st.columns([1.1, 1.1, 3])
 
         with c1:
-            if st.button("🔁 Retake Quiz", use_container_width=True):
+            if st.button("Retake Quiz", use_container_width=True):
                 reset_quiz()
                 st.session_state.page = "Quiz"
                 st.rerun()
 
         with c2:
-            if st.button("🏠 Go Home", use_container_width=True):
+            if st.button("Go Home", use_container_width=True):
                 st.session_state.page = "Home"
                 st.rerun()
 
@@ -457,14 +459,14 @@ else:
             c1, c2, _ = st.columns([1.1, 1.1, 3])
 
             with c1:
-                if st.button("📝 Return to Quiz", use_container_width=True):
+                if st.button("Return to Quiz", use_container_width=True):
                     first_flagged = sorted(st.session_state.flagged_questions)[0]
                     st.session_state.q_index = first_flagged
                     st.session_state.page = "Quiz"
                     st.rerun()
 
             with c2:
-                if st.button("🧹 Clear Flags", use_container_width=True):
+                if st.button("Clear Flags", use_container_width=True):
                     st.session_state.flagged_questions = set()
                     st.rerun()
 
@@ -473,7 +475,7 @@ else:
     elif st.session_state.page == "History":
         st.markdown(f"""
         <div class="hero-card">
-            <h1>📊 History</h1>
+            <h1>History</h1>
             <p class="subtle">Review your previous quiz attempts, scores, and timestamps.</p>
             <span class="stats-pill">{len(st.session_state.quiz_history)} Attempts</span>
         </div>
@@ -524,7 +526,7 @@ else:
                 st.rerun()
 
         with c2:
-            if st.button("🚪 Logout", use_container_width=True):
+            if st.button("Logout", use_container_width=True):
                 st.session_state.authenticated = False
                 st.session_state.username = ""
                 st.session_state.page = "AuthLanding"
