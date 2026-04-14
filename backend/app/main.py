@@ -2,7 +2,6 @@ import os
 
 from fastapi import FastAPI, Depends, File, Form, HTTPException, UploadFile, APIRouter
 from fastapi.concurrency import asynccontextmanager
-from requests import session
 from sqlmodel import Session, select, func
 
 from .security import create_access_token, get_current_user, get_password_hash, verify_password

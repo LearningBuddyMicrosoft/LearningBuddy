@@ -1,7 +1,9 @@
+import os
+
 import requests
 import streamlit as st
 
-API_BASE_URL = "http://localhost:8000"
+API_BASE_URL = os.getenv("BACKEND_URL", "http://localhost:8000")
 
 def api(method: str, endpoint: str, auth: bool = True, **kwargs):
     """Central API caller — attaches JWT automatically."""
