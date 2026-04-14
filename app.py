@@ -185,9 +185,12 @@ else:
         return static_questions
 
     if st.session_state.page == "Home":
+        col1, col2, col3 = st.columns([1, 1, 1])
+        with col2:
+            st.image("logo2.png", width=350) 
+
         st.markdown(f"""
         <div class="hero-card">
-            <h1>📘 Learning Buddy</h1>
             <h3 style="color:{colors["sub_text"]}; font-weight:500;">
                 Welcome, {st.session_state.username}
             </h3>
@@ -200,7 +203,6 @@ else:
         </div>
         """, unsafe_allow_html=True)
 
-        st.markdown("<div class='content-card'>", unsafe_allow_html=True)
         st.subheader("Upload your lecture notes")
 
         uploaded_file = st.file_uploader(
@@ -209,10 +211,8 @@ else:
             help="Upload a PDF lecture note to generate quiz questions automatically."
         )
 
-        c1, c2, _ = st.columns([1.1, 1.1, 3])
-
-        with c1:
-            if uploaded_file is not None:
+       
+        if uploaded_file is not None:
                 if st.button("🚀 Generate Quiz from PDF", use_container_width=True):
                     from backend.app.pdf_processor import generate_quiz_from_pdf
 
@@ -255,14 +255,15 @@ else:
                             reset_quiz()
                             st.session_state.page = "Quiz"
                             st.rerun()
-        with c2:
-            if st.button("View History", use_container_width=True):
-                st.session_state.page = "History"
-                st.rerun()
+ 
 
         st.markdown("</div>", unsafe_allow_html=True)
 
     elif st.session_state.page == "Quiz":
+        col1, col2, col3 = st.columns([1, 1, 1])
+        with col2:
+             st.image("logo2.png", width=350) 
+
         questions = get_questions()
 
         if not questions:
@@ -356,6 +357,9 @@ else:
         st.markdown("</div>", unsafe_allow_html=True)
 
     elif st.session_state.page == "Review":
+        col1, col2, col3 = st.columns([1, 1, 1])
+        with col2:
+             st.image("logo2.png", width=350) 
         questions = get_questions()
 
         st.markdown(f"""
@@ -429,6 +433,9 @@ else:
         st.markdown("</div>", unsafe_allow_html=True)
 
     elif st.session_state.page == "Flagged":
+        col1, col2, col3 = st.columns([1, 1, 1])
+        with col2:
+             st.image("logo2.png", width=350) 
         questions = get_questions()
 
         st.markdown(f"""
@@ -473,6 +480,9 @@ else:
         st.markdown("</div>", unsafe_allow_html=True)
 
     elif st.session_state.page == "History":
+        col1, col2, col3 = st.columns([1, 1, 1])
+        with col2:
+             st.image("logo2.png", width=350) 
         st.markdown(f"""
         <div class="hero-card">
             <h1>History</h1>
@@ -504,6 +514,9 @@ else:
         st.markdown("</div>", unsafe_allow_html=True)
 
     elif st.session_state.page == "Profile":
+        col1, col2, col3 = st.columns([1, 1, 1])
+        with col2:
+             st.image("logo2.png", width=350) 
         st.markdown("""
         <div class="hero-card">
             <h1>👤 Profile</h1>
@@ -511,7 +524,6 @@ else:
         </div>
         """, unsafe_allow_html=True)
 
-        st.markdown("<div class='content-card'>", unsafe_allow_html=True)
 
         st.write(f"**Username:** {st.session_state.username}")
         st.write(f"**Theme:** {st.session_state.theme}")
@@ -535,6 +547,9 @@ else:
 
         st.markdown("</div>", unsafe_allow_html=True)
     elif st.session_state.page=="Progress":
+        col1, col2, col3 = st.columns([1, 1, 1])
+        with col2:
+             st.image("logo2.png", width=350) 
         show_progress()
 
 st.markdown("""
