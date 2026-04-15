@@ -1,39 +1,55 @@
-import fitz  # PyMuPDF
-from langchain_text_splitters import RecursiveCharacterTextSplitter
+import time
+import os
+from .document_chunker import DocumentChunker
+from .quiz_generator import generate_question_from_chunk
 
-def process_lecture_pdf(file_path):
-    print(f"Processing: {file_path}")
+def generate_quiz_from_pdf(pdf_path: str, num_questions: int = 10) -> list[dict]:
+    """
+    Main function called by app.py to generate quiz questions from a PDF.
+    Uses DocumentChunker for extraction and quiz_generator for question creation.
+    """
+    overall_start = time.time()
     
-    # 1. Rip the text out of the PDF
+    # Initialize chunker and extract chunks from the PDF
+    chunker = DocumentChunker(overlap_size=50, chunk_size=200)
+    
     try:
-        doc = fitz.open(file_path)
-        full_text = ""
-        for page in doc:
-            full_text += page.get_text() + "\n"
+        chunks = chunker.chunk_file(pdf_path)
     except Exception as e:
-        return f"Error opening PDF: {e}"
-
-    # 2. Quick & dirty cleanup (Slides often have terrible line breaks)
-    clean_text = " ".join(full_text.split())
-
-    # 3. The Slicer (LangChain)
-    text_splitter = RecursiveCharacterTextSplitter(
-        chunk_size=1000,
-        chunk_overlap=200,
-        separators=["\n\n", "\n", ".", " ", ""]
-    )
+        print(f"Error chunking file: {e}")
+        return []
     
-    chunks = text_splitter.split_text(clean_text)
-    return chunks
+    if not chunks:
+        print("No chunks extracted from PDF")
+        return []
 
-# TESTING
-if __name__ == "__main__":
-    sample_pdf = r"C:\Users\hp\OneDrive\Desktop\Maynooth work\Microsoft Mentored Learning Buddy\pdfReaderLocal\Lecture4.pdf" 
+    # Select evenly distributed chunks for question generation
+    step = max(1, len(chunks) // num_questions) if chunks else 1
+    selected = chunks[::step][:num_questions]
+
+    questions = []
+    print(f"\n✅ Starting question generation for {len(selected)} chunks...")
     
-    my_chunks = process_lecture_pdf(sample_pdf)
-    
-    print(f"Total chunks generated: {len(my_chunks)}\n")
-    print("--- CHUNK 1 ---")
-    print(my_chunks[0] if len(my_chunks) > 0 else "No text found.")
-    print("\n--- CHUNK 2 ---")
-    print(my_chunks[1] if len(my_chunks) > 1 else "No text found.")
+    for i, chunk in enumerate(selected):
+        chunk_start = time.time()
+        print(f"Generating question {i+1}/{len(selected)}... (Chunk length: {len(chunk)} chars)")
+        
+        try:
+            q = generate_question_from_chunk(chunk)
+
+            # Validate question structure
+            if q.get("q") and len(q.get("options", [])) == 4 and q.get("answer"):
+                questions.append(q)
+                print(f"✓ Question {i+1} created successfully")
+            else:
+                print(f"✗ Question {i+1} skipped - invalid structure")
+
+        except Exception as e:
+            print(f"Error generating question {i+1}: {e}")
+            continue
+            
+        print(f"Question {i+1} finished in {time.time() - chunk_start:.2f} seconds.\n")
+
+    print(f"\n🎉 Total process took {time.time() - overall_start:.2f} seconds.")
+    print(f"Successfully generated {len(questions)} out of {len(selected)} questions.\n")
+    return questions
