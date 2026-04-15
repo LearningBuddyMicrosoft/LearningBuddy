@@ -4,6 +4,7 @@ import streamlit as st
 from frontend.pages.helpers import initialize_session_state, reset_quiz, submit_quiz
 from frontend.pages.styles import get_theme_colors, apply_custom_css
 from frontend.pages.progress import show_progress
+from frontend.pages.topic import show_topic_select
 
 st.set_page_config(
     page_title="Learning Buddy",
@@ -143,40 +144,20 @@ if not st.session_state.authenticated:
                         st.session_state.users[username] = password
                         st.session_state.username = username
                         st.session_state.authenticated = True
-                        st.session_state.page = "Home"
+                        st.session_state.page = "Topic"
                         reset_quiz()
                         st.rerun()
 
 else:
     st.markdown("<div class='main-navbar'>", unsafe_allow_html=True)
 
-    nav1, nav2, nav3, nav4, nav5, nav6 = st.columns(6)
+    nav_options = ["Topic","Home", "Quiz", "Flagged", "History", "Profile", "Progress"]
 
-    with nav1:
-        if st.button("Home", use_container_width=True):
-            st.session_state.page = "Home"
+    selected = st.sidebar.radio("Navigation", nav_options)
 
-    with nav2:
-        if st.button("Quiz", use_container_width=True):
-            st.session_state.page = "Quiz"
-
-    with nav3:
-        if st.button("Flagged", use_container_width=True):
-            st.session_state.page = "Flagged"
-
-    with nav4:
-        if st.button("History", use_container_width=True):
-            st.session_state.page = "History"
-
-    with nav5:
-        if st.button("Profile", use_container_width=True):
-            st.session_state.page = "Profile"
-    with nav6:
-        if st.button("Progress",use_container_width=True):
-            st.session_state.page = "Progress"
+    st.session_state.page = selected
 
     st.markdown("</div>", unsafe_allow_html=True)
-
     # ── resolve questions from session state or fall back to static list ──
     def get_questions():
         if st.session_state.get("questions") is not None:
@@ -186,8 +167,25 @@ else:
 
     if st.session_state.page == "Home":
         col1, col2, col3 = st.columns([1, 1, 1])
+        with col1:
+            st.markdown(f'<div style=" font-size:20px;">{st.session_state.page}</div>',
+                    unsafe_allow_html=True)
+
         with col2:
             st.image("logo2.png", width=350) 
+        with col3:
+            topic = st.session_state.get('selected_topic', '')
+            if topic:
+                st.markdown(
+                    f'<div style=" font-size:20px;">{topic}</div>',
+                    unsafe_allow_html=True
+        )  
+            else:
+                st.markdown(
+                 '<div style="font-size:20px; color:gray;">No topic selected</div>',
+            unsafe_allow_html=True
+        )
+            
 
         st.markdown(f"""
         <div class="hero-card">
@@ -268,7 +266,7 @@ else:
 
         if not questions:
             st.warning("No questions loaded. Please upload a PDF or use the default quiz.")
-            if st.button("🏠 Go Home"):
+            if st.button(" Go Home"):
                 st.session_state.page = "Home"
                 st.rerun()
             st.stop()
@@ -551,7 +549,8 @@ else:
         with col2:
              st.image("logo2.png", width=350) 
         show_progress()
-
+    elif st.session_state.page == "Topic":
+        show_topic_select()
 st.markdown("""
 <div class="footer-fixed">
     Learning Buddy © 2026
