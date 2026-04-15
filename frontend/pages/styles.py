@@ -241,7 +241,7 @@ def apply_custom_css(colors):
         display: block;
         border-radius: 12px;
         border: 1px solid transparent;
-        background: {colors["shell_button"]};
+        background: #205a56;
         color: white;
         font-weight: 600;
         padding: 0.65rem 0.8rem;
