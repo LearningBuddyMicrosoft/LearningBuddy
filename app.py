@@ -152,10 +152,21 @@ else:
     st.markdown("<div class='main-navbar'>", unsafe_allow_html=True)
 
     nav_options = ["Topic","Home", "Quiz", "Flagged", "History", "Profile", "Progress"]
+    if "nav_selection" not in st.session_state:
+        st.session_state.nav_selection = st.session_state.page if st.session_state.page in nav_options else "Home"
+    if "prev_nav_selection" not in st.session_state:
+        st.session_state.prev_nav_selection = st.session_state.nav_selection
 
-    selected = st.sidebar.radio("Navigation", nav_options)
+    selected = st.sidebar.radio(
+        "Navigation",
+        nav_options,
+        index=nav_options.index(st.session_state.nav_selection),
+        key="nav_selection"
+    )
 
-    st.session_state.page = selected
+    if selected != st.session_state.prev_nav_selection:
+        st.session_state.page = selected
+        st.session_state.prev_nav_selection = selected
 
     st.markdown("</div>", unsafe_allow_html=True)
     # ── resolve questions from session state or fall back to static list ──
@@ -378,7 +389,7 @@ else:
                 st.rerun()
 
         with r2:
-            if st.button("🚩 Show Flagged", use_container_width=True):
+            if st.button(" Show Flagged", use_container_width=True):
                 st.session_state.review_mode = "Flagged"
                 st.rerun()
 
@@ -480,36 +491,80 @@ else:
     elif st.session_state.page == "History":
         col1, col2, col3 = st.columns([1, 1, 1])
         with col2:
-             st.image("logo2.png", width=350) 
+            st.image("logo2.png", width=350)
         st.markdown(f"""
         <div class="hero-card">
             <h1>History</h1>
-            <p class="subtle">Review your previous quiz attempts, scores, and timestamps.</p>
+            <p class="subtle">Review your previous quiz attempts, scores, topics, and timestamps.</p>
             <span class="stats-pill">{len(st.session_state.quiz_history)} Attempts</span>
         </div>
         """, unsafe_allow_html=True)
 
-        st.markdown("<div class='content-card'>", unsafe_allow_html=True)
-        if not st.session_state.quiz_history:
-            st.info("No quiz attempts yet. Complete a quiz and your history will appear here.")
-        else:
-            for idx, attempt in enumerate(st.session_state.quiz_history, start=1):
-                st.markdown(f"""
-                <div style="
-                    background:{colors["option_bg"]};
-                    border:1px solid {colors["border"]};
-                    border-radius:14px;
-                    padding:0.85rem;
-                    margin-bottom:0.75rem;">
-                    <strong>Attempt {idx}</strong><br>
-                    <strong>Score:</strong> {attempt['score']} / {attempt['total']}<br>
-                    <strong>Percentage:</strong> {attempt['percentage']}%<br>
-                    <strong>Completed:</strong> {attempt['timestamp']}<br>
-                    <strong>Flagged Questions:</strong> {attempt['flagged_count']}
-                </div>
-                """, unsafe_allow_html=True)
+        if st.session_state.history_review_index is None:
+            st.markdown("<div class='content-card'>", unsafe_allow_html=True)
+            if not st.session_state.quiz_history:
+                st.info("No quiz attempts yet. Complete a quiz and your history will appear here.")
+            else:
+                for idx, attempt in enumerate(st.session_state.quiz_history, start=1):
+                    st.markdown(f"""
+                    <div style="
+                        background:{colors["option_bg"]};
+                        border:1px solid {colors["border"]};
+                        border-radius:14px;
+                        padding:0.85rem;
+                        margin-bottom:0.75rem;">
+                        <strong>Attempt {idx}</strong><br>
+                        <strong>Topic:</strong> {attempt.get('topic', 'None')}<br>
+                        <strong>Score:</strong> {attempt['score']} / {attempt['total']}<br>
+                        <strong>Percentage:</strong> {attempt['percentage']}%<br>
+                        <strong>Completed:</strong> {attempt['timestamp']}<br>
+                        <strong>Flagged Questions:</strong> {attempt['flagged_count']}
+                    </div>
+                    """, unsafe_allow_html=True)
 
-        st.markdown("</div>", unsafe_allow_html=True)
+                    if st.button("View Details", key=f"view_history_{idx}", use_container_width=True):
+                        st.session_state.history_review_index = idx - 1
+                        st.rerun()
+            st.markdown("</div>", unsafe_allow_html=True)
+
+        if (
+            st.session_state.history_review_index is not None
+            and 0 <= st.session_state.history_review_index < len(st.session_state.quiz_history)
+        ):
+            selected_attempt = st.session_state.quiz_history[st.session_state.history_review_index]
+            st.markdown("<div class='content-card'>", unsafe_allow_html=True)
+            st.markdown(f"""
+                <div class="hero-card">
+                    <h2>Attempt {st.session_state.history_review_index + 1} Review</h2>
+                    <p class="subtle">Detailed review of a completed quiz.</p>
+                    <span class="stats-pill">Topic: {selected_attempt.get('topic', 'None')}</span>
+                    <span class="stats-pill">Score: {selected_attempt['score']} / {selected_attempt['total']}</span>
+                    <span class="stats-pill">Percentage: {selected_attempt['percentage']}%</span>
+                    <span class="stats-pill">Completed: {selected_attempt['timestamp']}</span>
+                </div>
+            """, unsafe_allow_html=True)
+
+            for i, q in enumerate(selected_attempt["questions"]):
+                user_answer = selected_attempt["selected_answers"].get(i, "No answer selected")
+                correct_answer = q["answer"].strip()
+                is_correct = user_answer.strip() == correct_answer
+                box_class = "review-correct" if is_correct else "review-wrong"
+
+                st.markdown(f"<div class='{box_class}'>", unsafe_allow_html=True)
+                st.markdown(f"**Q{i+1}. {q['q']}**")
+                st.markdown(f"**Your Answer:** {user_answer}")
+                st.markdown(f"**Correct Answer:** {correct_answer}")
+                st.markdown(f"**Result:** {'✅ Correct' if is_correct else '❌ Incorrect'}")
+                if q.get("explanation"):
+                    st.markdown(f"**Why:** {q['explanation']}")
+                if q.get("source"):
+                    st.caption(f"Source: {q['source']}")
+                st.markdown("</div>", unsafe_allow_html=True)
+
+            if st.button("Back to Attempts", use_container_width=True):
+                st.session_state.history_review_index = None
+                st.rerun()
+            st.markdown("</div>", unsafe_allow_html=True)
 
     elif st.session_state.page == "Profile":
         col1, col2, col3 = st.columns([1, 1, 1])
