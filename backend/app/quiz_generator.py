@@ -21,8 +21,9 @@ Explanation: TCP (Transmission Control Protocol) uses acknowledgements and retra
 
 
 def generate_question_from_chunk(chunk: str) -> dict:
+    """Generate a SINGLE question from a chunk"""
     prompt = f"""<|user|>
-You are a quiz generator for university students. Using ONLY the study text below, create one multiple choice question with exactly 4 options (A, B, C, D). One must be correct. Include a short explanation of the correct answer.
+You are a quiz generator for university students. Using ONLY the study text below, create one multiple choice question with exactly 4 options (A, B, C, D). One must be correct. Include a short explanation.
 
 {FEW_SHOT}
 
@@ -43,6 +44,56 @@ Explanation: [one sentence]
 
     raw = generate(prompt)
     return parse_question(raw, chunk)
+
+
+def generate_multiple_questions_from_chunk(chunk: str, num_questions: int = 3) -> list[dict]:
+    """Generate MULTIPLE questions from a single chunk"""
+    questions = []
+    
+    # Split chunk into sub-chunks if it's long enough
+    sentences = chunk.split(". ")
+    
+    for i in range(num_questions):
+        # Create a different sub-prompt for each question to get variety
+        start_idx = (i * len(sentences)) // num_questions
+        end_idx = ((i + 1) * len(sentences)) // num_questions
+        sub_chunk = ". ".join(sentences[start_idx:end_idx])
+        
+        if not sub_chunk.strip():
+            continue
+            
+        prompt = f"""<|user|>
+You are a quiz generator for university students. Using ONLY the study text below, create one multiple choice question with exactly 4 options (A, B, C, D). One must be correct. Include a short explanation.
+
+IMPORTANT: This is question {i+1} of {num_questions}. Generate a DIFFERENT question than previous ones.
+
+{FEW_SHOT}
+
+Now generate one question from this text:
+{sub_chunk[:500]}
+
+Respond ONLY in plain text using EXACTLY this format. No extra words before or after:
+
+Q: [question]
+A) [option]
+B) [option]
+C) [option]
+D) [option]
+Answer: [A, B, C, or D]
+Explanation: [one sentence]
+<|end|>
+<|assistant|>"""
+
+        try:
+            raw = generate(prompt)
+            q = parse_question(raw, chunk)
+            if q.get("q") and len(q.get("options", [])) == 4 and q.get("answer"):
+                questions.append(q)
+        except Exception as e:
+            print(f"Error generating question {i+1}: {e}")
+            continue
+    
+    return questions
 
 
 def parse_question(raw: str, source_chunk: str) -> dict:

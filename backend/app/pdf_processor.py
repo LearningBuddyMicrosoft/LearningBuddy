@@ -1,83 +1,53 @@
-import fitz  # PyMuPDF
+from .document_chunker import DocumentChunker
+from .quiz_generator import generate_multiple_questions_from_chunk
 import time
-from langchain_core.documents import Document
-from langchain_text_splitters import RecursiveCharacterTextSplitter
-
-
-from .quiz_generator import generate_question_from_chunk
-
-def chunk_by_slide(file_path: str) -> list[str]:
-    print(f"\nReading {file_path}...")
-    start_time = time.time()
-    documents = []
-    
-    try:
-        doc = fitz.open(file_path)
-        for page_num, page in enumerate(doc):
-            text = page.get_text().strip()
-            
-            if text: 
-                metadata = {
-                    "page_number": page_num + 1,
-                    "source": file_path
-                }
-                documents.append(Document(page_content=text, metadata=metadata))
-        
-        doc.close()
-                
-    except Exception as e:
-        print(f"Error opening PDF: {e}")
-        return []
-
-    print(f"PDF read and extracted in {time.time() - start_time:.2f} seconds.")
-    
-    split_start = time.time()
-    safety_splitter = RecursiveCharacterTextSplitter(
-        chunk_size=3000,
-        chunk_overlap=200,
-        length_function=len,
-        separators=["\n\n", "\n", " ", ""] 
-    )
-    
-    final_chunks = safety_splitter.split_documents(documents)
-    print(f"Text split by LangChain in {time.time() - split_start:.2f} seconds.")
-    
-    string_chunks = []
-    for chunk in final_chunks:
-        slide_num = chunk.metadata.get("page_number", "Unknown")
-        formatted_text = f"--- SLIDE {slide_num} ---\n{chunk.page_content}\n"
-        string_chunks.append(formatted_text)
-        
-    return string_chunks
-
 
 def generate_quiz_from_pdf(pdf_path: str, num_questions: int = 10) -> list[dict]:
+    """
+    Generate quiz questions from a PDF file.
+    Now generates MULTIPLE questions per chunk for better coverage.
+    """
     overall_start = time.time()
-    chunks = chunk_by_slide(pdf_path)
-
-    step = max(1, len(chunks) // num_questions) if chunks else 1
-    selected = chunks[::step][:num_questions]
-
-    questions = []
-    print(f"\nStarting question generation for {len(selected)} chunks...")
     
-    for i, chunk in enumerate(selected):
+    # Initialize the chunker
+    chunker = DocumentChunker(chunk_size=800, overlap_size=100)
+    chunks = chunker.chunk_file(pdf_path)
+    
+    if not chunks:
+        print("No text could be extracted from the PDF")
+        return []
+    
+    questions = []
+    
+    # Generate multiple questions per chunk
+    questions_per_chunk = max(1, num_questions // len(chunks))
+    
+    print(f"\nGenerating {num_questions} questions from {len(chunks)} chunks...")
+    print(f"   (~{questions_per_chunk} questions per chunk)\n")
+    
+    for i, chunk in enumerate(chunks):
         chunk_start = time.time()
-        print(f"Generating question {i+1}/{len(selected)}... (Chunk length: {len(chunk)} chars)")
+        print(f"Processing chunk {i+1}/{len(chunks)}...")
         
         try:
-            q = generate_question_from_chunk(chunk)
-
-            if q.get("q") and len(q.get("options", [])) == 4 and q.get("answer"):
-                questions.append(q)
-            else:
-                print("Skipped invalid question")
-
-        except Exception as e:
-            print("Error generating question:", e)
-            continue
+            # Generate multiple questions from this chunk
+            chunk_questions = generate_multiple_questions_from_chunk(chunk, num_questions=questions_per_chunk)
+            questions.extend(chunk_questions)
+            print(f"Generated {len(chunk_questions)} questions")
             
-        print(f"Question {i+1} finished in {time.time() - chunk_start:.2f} seconds.")
-
-    print(f"\nTotal process took {time.time() - overall_start:.2f} seconds.")
+        except Exception as e:
+            print(f"Error: {e}")
+            continue
+        
+        print(f"Chunk {i+1} finished in {time.time() - chunk_start:.2f} seconds.\n")
+        
+        # Stop if we have enough questions
+        if len(questions) >= num_questions:
+            questions = questions[:num_questions]
+            break
+    
+    total_time = time.time() - overall_start
+    print(f"Total process took {total_time:.2f} seconds.")
+    print(f"Successfully generated {len(questions)}/{num_questions} questions\n")
+    
     return questions
