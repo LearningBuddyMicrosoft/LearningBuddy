@@ -103,11 +103,11 @@ def show_progress():
             max_score = max(percentages[:-1])
      
             if last > previous:
-                st.success("📈 Better than last attempt!")
+                st.success("Better than last attempt!")
             elif last < previous:
-                st.error("📉 Worse than last attempt.")
+                st.error("Worse than last attempt.")
             else:
-                st.info("➖ Same as last attempt.")
+                st.info("Same as last attempt.")
         else:
             last = percentages[-1]
             max_score = last

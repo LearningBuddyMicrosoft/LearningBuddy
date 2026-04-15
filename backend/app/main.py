@@ -1,6 +1,7 @@
 import os
+import sys
 
-from fastapi import FastAPI, Depends, File, Form, HTTPException, UploadFile, APIRouter
+from fastapi import FastAPI, Depends, File, Form, HTTPException, UploadFile, APIRouter, Response as FAResponse
 from fastapi.concurrency import asynccontextmanager
 from requests import session
 from sqlmodel import Session, select, func
@@ -9,7 +10,8 @@ from .security import create_access_token, get_current_user, get_password_hash, 
 from .database import create_db_and_tables, get_session
 from datetime import date
 from .models import Material, Question, Quiz, Response, Subject, Topic, User, QuizAttempt # From your previous steps
-from.schemas import DashboardRead, QuizCreate, QuizRead, SubjectCreate, TopicCreate, TopicDetailedRead, UserCreate, StartAttempt, AnswerSubmission, FinishAttempt, BatchSubmission
+from .schemas import DashboardRead, QuizCreate, QuizRead, SubjectCreate, TopicCreate, TopicDetailedRead, UserCreate, StartAttempt, AnswerSubmission, FinishAttempt, BatchSubmission
+from .pdf_processor import generate_quiz_from_pdf
 
 app = FastAPI()
 
@@ -233,7 +235,7 @@ def create_topic(payload: TopicCreate, session: Session = Depends(get_session),c
     if not subject:
         raise HTTPException(status_code=404, detail="Subject not found")
     if subject.user_id != current_user.id:
-        raise HTTPException(status_code=403, detpiail="You do not have access to this subject")
+        raise HTTPException(status_code=403, detail="You do not have access to this subject")
     new_topic = Topic(
         subject_id=payload.subject_id,
         name=payload.name)
@@ -266,6 +268,24 @@ def add_material(topic_id: int = Form(...), file: UploadFile = File(...), sessio
     session.add(new_material)
     session.commit()
     session.refresh(new_material)
+
+    # ── AI Integration: Generate Questions from PDF ───────────────────────────
+    try:
+        generated_questions = generate_quiz_from_pdf(file_path, num_questions=5)
+        for gq in generated_questions:
+            new_q = Question(
+                topic_id=topic_id,
+                question_text=gq["q"],
+                options=gq["options"],
+                correct_answer=gq["answer"],
+                question_type="MCQ",
+                difficulty=5 # Defaulting AI generated questions to medium difficulty
+            )
+            session.add(new_q)
+        session.commit()
+    except Exception as e:
+        print(f"⚠️ Failed to generate AI questions for topic {topic_id}: {e}")
+
     return new_material
 
 @app.post("/quizzes/generate")
@@ -327,3 +347,28 @@ def start_quiz(quiz_id: int, session: Session = Depends(get_session), current_us
         raise HTTPException(status_code=403, detail="You do not have access to this quiz")
     quiz.questions
     return quiz
+
+@app.get("/attempts/{attempt_id}/report")
+def get_attempt_report(attempt_id: int, session: Session = Depends(get_session), current_user: User = Depends(get_current_user)):
+    # Ensure the generator path is accessible
+    sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+    from pdf_generator.generator import generate_quiz_report
+
+    attempt = session.get(QuizAttempt, attempt_id)
+    if not attempt or attempt.user_id != current_user.id:
+        raise HTTPException(status_code=404, detail="Attempt not found")
+
+    quiz_data = []
+    for resp in attempt.responses:
+        quiz_data.append({
+            "question": resp.question.question_text,
+            "answer": resp.question.correct_answer
+        })
+
+    pdf_bytes = generate_quiz_report(quiz_data, attempt_id, score=attempt.score)
+
+    return FAResponse(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f"attachment; filename=quiz_report_{attempt_id}.pdf"}
+    )
