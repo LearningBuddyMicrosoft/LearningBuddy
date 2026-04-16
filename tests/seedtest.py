@@ -13,12 +13,12 @@ from sqlmodel import Session, select
 
 # --- Setup ---
 st.set_page_config(layout="wide")
-st.title("📚 Learning Platform")
+st.title("Learning Platform")
 
 # --- Sidebar Controls ---
-st.sidebar.header("⚙️ Controls")
+st.sidebar.header("Controls")
 
-if st.sidebar.button("🔄 Reset Database"):
+if st.sidebar.button("Reset Database"):
     seed_data()
     st.sidebar.success("Database reset!")
     st.rerun()
@@ -39,7 +39,7 @@ with Session(engine) as session:
     users = session.exec(select(User)).all()
     user_map = {u.username: u.id for u in users}
 
-    selected_user = st.selectbox("👤 Select User", list(user_map.keys()))
+    selected_user = st.selectbox("Select User", list(user_map.keys()))
 
     if selected_user:
         user_id = user_map[selected_user]
@@ -50,7 +50,7 @@ with Session(engine) as session:
         ).all()
 
         subject_map = {s.name: s.id for s in subjects}
-        selected_subject = st.selectbox("📘 Select Subject", list(subject_map.keys()))
+        selected_subject = st.selectbox("Select Subject", list(subject_map.keys()))
 
         if selected_subject:
             subject_id = subject_map[selected_subject]
@@ -61,13 +61,13 @@ with Session(engine) as session:
             ).all()
 
             topic_map = {t.name: t.id for t in topics}
-            selected_topic = st.selectbox("🧠 Select Topic", list(topic_map.keys()))
+            selected_topic = st.selectbox("Select Topic", list(topic_map.keys()))
 
             if selected_topic:
                 topic_id = topic_map[selected_topic]
 
                 # ================= DIFFICULTY =================
-                difficulty = st.selectbox("🎯 Difficulty", [1, 2, 3])
+                difficulty = st.selectbox("Difficulty", [1, 2, 3])
 
                 questions = session.exec(
                     select(Question).where(
@@ -79,7 +79,7 @@ with Session(engine) as session:
                 if not questions:
                     st.warning("No questions for this difficulty.")
                 else:
-                    st.subheader("📝 Quiz")
+                    st.subheader("Quiz")
 
                     answers = {}
 
@@ -92,7 +92,7 @@ with Session(engine) as session:
                         )
 
                     # --- Submit Quiz ---
-                    if st.button("✅ Submit Quiz"):
+                    if st.button("Submit Quiz"):
                         score = 0
 
                         for q in questions:
@@ -105,7 +105,7 @@ with Session(engine) as session:
                     # --- Show Results ---
                     if st.session_state.submitted:
                         st.success(
-                            f"🎉 Score: {st.session_state.score} / {len(questions)}"
+                            f"Score: {st.session_state.score} / {len(questions)}"
                         )
 
                         # Show correct answers
@@ -114,5 +114,5 @@ with Session(engine) as session:
                                 st.success(f"✔ {q.question_text}")
                             else:
                                 st.error(
-                                    f"✘ {q.question_text} → Correct: {q.correct_answer}"
+                                    f"Incorrect: {q.question_text} - Correct: {q.correct_answer}"
                                 )

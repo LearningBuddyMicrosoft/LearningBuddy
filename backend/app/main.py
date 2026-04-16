@@ -37,13 +37,13 @@ def get_user_mastery(user_id: int, session: Session = Depends(get_session)):
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Everything BEFORE 'yield' happens when the server TURNS ON
-    print("🚀 App starting up: Creating database and tables...")
+    print("App starting up: Creating database and tables...")
     create_db_and_tables()
     
     yield # This is where the app actually runs!
     
     # Everything AFTER 'yield' happens when the server TURNS OFF
-    print("👋 App shutting down: Cleaning up resources...")     
+    print("App shutting down: Cleaning up resources...")     
 
 app = FastAPI(lifespan=lifespan)
 

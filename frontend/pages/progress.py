@@ -103,9 +103,9 @@ def show_progress():
             max_score = max(percentages[:-1])
      
             if last > previous:
-                st.success("📈 Better than last attempt!")
+                st.success("Better than last attempt!")
             elif last < previous:
-                st.error("📉 Worse than last attempt.")
+                st.error("Worse than last attempt.")
             else:
                 st.info("➖ Same as last attempt.")
         else:
@@ -137,6 +137,6 @@ def show_progress():
                     for q in wrong_questions:
                         st.markdown(f"- {q}")
                 else:
-                    st.markdown("🎉 All correct! No suggested topics.")
+                    st.markdown("All correct! No suggested topics.")
         else:
             st.info("No quiz attempts yet.")

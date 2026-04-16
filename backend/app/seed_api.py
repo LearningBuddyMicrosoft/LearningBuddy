@@ -4,37 +4,37 @@ import os
 BASE_URL = "http://127.0.0.1:8000"
 
 def run_seed():
-    print("🚀 Starting LearningBuddy API Seeding Process...\n")
+    print("Starting LearningBuddy API Seeding Process...\n")
 
     # ==========================================
     # 1. AUTHENTICATION (Get the Wristband)
     # ==========================================
     user_payload = {"username": "Jia Jun", "password": "securepassword123"}
     
-    print("👤 Registering User...")
+    print("Registering User...")
     reg_res = requests.post(f"{BASE_URL}/register/", json=user_payload)
     if reg_res.status_code == 400:
         print("   User already exists, proceeding to login...")
     elif reg_res.status_code != 200:
-        print(f"❌ Failed to register: {reg_res.text}")
+        print(f"Failed to register: {reg_res.text}")
         return
 
-    print("🔑 Logging In...")
+    print("Logging In...")
     login_res = requests.post(f"{BASE_URL}/login/", json=user_payload)
     if login_res.status_code != 200:
-        print(f"❌ Login failed: {login_res.text}")
+        print(f"Login failed: {login_res.text}")
         return
         
     token = login_res.json().get("access_token")
     # This header is your digital wristband! We attach it to all future requests.
     HEADERS = {"Authorization": f"Bearer {token}"}
-    print("   ✅ Access Token Acquired!\n")
+    print("   Access Token Acquired!\n")
 
 
     # ==========================================
     # 2. CREATE SUBJECTS
     # ==========================================
-    print("📚 Creating Subjects...")
+    print("Creating Subjects...")
     subjects_to_create = ["CS335 - Software Engineering", "Machine Learning Foundations"]
     subject_ids = []
 
@@ -43,19 +43,19 @@ def run_seed():
         if res.status_code == 200:
             sub_id = res.json().get("id")
             subject_ids.append(sub_id)
-            print(f"   ✅ Created Subject: {sub_name} (ID: {sub_id})")
+            print(f"   Created Subject: {sub_name} (ID: {sub_id})")
         else:
-            print(f"   ❌ Failed to create subject: {res.text}")
+            print(f"   Failed to create subject: {res.text}")
 
 
     # ==========================================
     # 3. CREATE TOPICS
     # ==========================================
     if len(subject_ids) < 2:
-        print("❌ Missing subjects, aborting topic creation.")
+        print("Missing subjects, aborting topic creation.")
         return
 
-    print("\n📝 Creating Topics...")
+    print("\nCreating Topics...")
     topics_data = [
         {"subject_id": subject_ids[0], "name": "Design Patterns & Architecture"},
         {"subject_id": subject_ids[0], "name": "API Security Models"},
@@ -68,9 +68,9 @@ def run_seed():
         if res.status_code == 200:
             top_id = res.json().get("id")
             topic_ids.append(top_id)
-            print(f"   ✅ Created Topic: {t['name']} (ID: {top_id})")
+            print(f"   Created Topic: {t['name']} (ID: {top_id})")
         else:
-            print(f"   ❌ Failed to create topic: {res.text}")
+            print(f"   Failed to create topic: {res.text}")
 
 
     # ==========================================
@@ -79,7 +79,7 @@ def run_seed():
     if not topic_ids:
         return
         
-    print("\n📄 Uploading Study Material...")
+    print("\nUploading Study Material...")
     # Let's dynamically create a dummy PDF file to upload so the script is self-contained
     dummy_file_path = "dummy_notes.pdf"
     with open(dummy_file_path, "wb") as f:
@@ -94,9 +94,9 @@ def run_seed():
         res = requests.post(f"{BASE_URL}/materials/upload", files=files, data=data, headers=HEADERS)
         
         if res.status_code == 200:
-            print(f"   ✅ Material uploaded successfully to Topic ID {topic_ids[0]}!")
+            print(f"   Material uploaded successfully to Topic ID {topic_ids[0]}!")
         else:
-            print(f"   ❌ Failed to upload material: {res.text}")
+            print(f"   Failed to upload material: {res.text}")
 
     # Clean up the dummy file locally
     if os.path.exists(dummy_file_path):
@@ -105,14 +105,14 @@ def run_seed():
     # ==========================================
     # 5. TEST DASHBOARD FETCH
     # ==========================================
-    print("\n📊 Fetching Final Dashboard...")
+    print("\nFetching Final Dashboard...")
     dash_res = requests.get(f"{BASE_URL}/dashboard", headers=HEADERS)
     if dash_res.status_code == 200:
-        print("   ✅ Dashboard fetched successfully! Data structure looks good.")
+        print("   Dashboard fetched successfully! Data structure looks good.")
     else:
-        print(f"   ❌ Failed to fetch dashboard: {dash_res.text}")
+        print(f"Failed to fetch dashboard: {dash_res.text}")
 
-    print("\n🎉 API Seeding Complete! The database is ready.")
+    print("\nAPI Seeding Complete! The database is ready.")
 
 if __name__ == "__main__":
     run_seed()

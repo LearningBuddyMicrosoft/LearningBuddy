@@ -1,5 +1,6 @@
 import re
 from ai.ollama_client import generate
+from ai.hallucination import calculate_hallucination_score
 
 FEW_SHOT = """Here are two example questions:
 
@@ -117,10 +118,23 @@ def parse_question(raw: str, source_chunk: str) -> dict:
     letter_map = {"A": 0, "B": 1, "C": 2, "D": 3}
     answer_text = options[letter_map[answer_letter]] if answer_letter in letter_map and options else ""
 
+    # 🔥 ADD THIS PART
+    response_text = f"Question: {question}\nAnswer: {answer_text}\nExplanation: {explanation}"
+    
+    try:
+        score = calculate_hallucination_score(
+            response=response_text,
+            context=[{"text": source_chunk}]
+        )
+    except Exception as e:
+        print(f"Error calculating hallucination score: {e}")
+        score = None
+
     return {
         "q": question,
         "options": options,
         "answer": answer_text,
         "explanation": explanation,
-        "source": source_chunk[:200]
+        "source": source_chunk[:200],
+        "hallucination_score": score  
     }
