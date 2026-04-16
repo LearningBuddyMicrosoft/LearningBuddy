@@ -1,7 +1,7 @@
 import json
 import requests
 
-OLLAMA_URL = "http://localhost:11434/api/generate"
+OLLAMA_URL = "http://host.docker.internal:11434"
 
 
 def generate_multiple_questions_from_chunk(chunk: str, num_questions: int = 3) -> list[dict]:
@@ -35,7 +35,7 @@ TEXT:
 """
 
     response = requests.post(
-        OLLAMA_URL,
+        f"{OLLAMA_URL}/api/generate", 
         json={
             "model": "llama3",
             "prompt": prompt,

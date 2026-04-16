@@ -1,11 +1,13 @@
 import os
 
-from fastapi import FastAPI, Depends, File, Form, HTTPException, UploadFile, APIRouter
+from fastapi import FastAPI, Depends, File, Form, HTTPException, UploadFile, BackgroundTasks
 from fastapi.concurrency import asynccontextmanager
 from sqlmodel import Session, select, func
 
+from .pdf_processor import generate_and_store_quiz
+
 from .security import create_access_token, get_current_user, get_password_hash, verify_password
-from .database import create_db_and_tables, get_session
+from .database import create_db_and_tables, get_session, engine
 from datetime import date
 from .models import Material, Question, Quiz, Response, Subject, Topic, User, QuizAttempt # From your previous steps
 from.schemas import DashboardRead, QuizCreate, QuizRead, SubjectCreate, TopicCreate, TopicDetailedRead, UserCreate, StartAttempt, AnswerSubmission, FinishAttempt, BatchSubmission
@@ -241,8 +243,21 @@ def create_topic(payload: TopicCreate, session: Session = Depends(get_session),c
     session.refresh(new_topic)
     return new_topic
 
+
+def process_pdf_in_background(file_path: str, topic_id: int):
+    with Session(engine) as background_session:
+        try:
+            generate_and_store_quiz(
+                pdf_path=file_path, 
+                session=background_session, 
+                topic_id=topic_id, 
+                num_questions=10 # Adjust if needed
+            )
+        except Exception as e:
+            print(f"❌ Background AI Task Failed: {e}")
+            
 @app.post("/materials/upload")
-def add_material(topic_id: int = Form(...), file: UploadFile = File(...), session: Session = Depends(get_session),current_user: User = Depends(get_current_user)):
+def add_material(background_tasks: BackgroundTasks, topic_id: int = Form(...), file: UploadFile = File(...), session: Session = Depends(get_session),current_user: User = Depends(get_current_user)):
     topic = session.get(Topic, topic_id)
     if not topic:
         raise HTTPException(status_code=404, detail="Topic not found")
@@ -265,6 +280,9 @@ def add_material(topic_id: int = Form(...), file: UploadFile = File(...), sessio
     session.add(new_material)
     session.commit()
     session.refresh(new_material)
+
+    background_tasks.add_task(process_pdf_in_background, file_path, topic_id)
+
     return new_material
 
 @app.post("/quizzes/generate")

@@ -8,3 +8,8 @@ python-multipart
 dotenv
 google-auth
 psycopg2-binary
+PyPDF2
+python-docx
+python-pptx
+Pillow
+requests

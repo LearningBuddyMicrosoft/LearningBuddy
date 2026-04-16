@@ -1,5 +1,5 @@
 from sqlmodel import Session
-from models import Question  # adjust import to your project
+from .models import Question  # adjust import to your project
 
 
 def questions_to_models(questions_json: list[dict], topic_id: int) -> list[Question]:

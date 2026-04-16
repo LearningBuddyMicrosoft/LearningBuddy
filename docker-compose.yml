@@ -1,49 +1,49 @@
-version: '3.8'
+  version: '3.8'
 
-services:
-  frontend:
-    build: 
-      context: ./frontend
-    ports:
-      - "8501:8501"
-    volumes:
-      - ./frontend:/app
-    environment:
-      - BACKEND_URL=http://backend:8000 
-    depends_on:
-      - backend
+  services:
+    frontend:
+      build: 
+        context: ./frontend
+      ports:
+        - "8501:8501"
+      volumes:
+        - ./frontend:/app
+      environment:
+        - BACKEND_URL=http://backend:8000 
+      depends_on:
+        - backend
 
-  backend:
-    build:
-      context: ./backend
-    ports:
-      - "8000:8000"
-    env_file:
-      - .env
-    volumes:
-      - ./backend:/app
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
-    depends_on:
-      db:
-        # THE FIX: Wait until Postgres is fully ready, not just turned on!
-        condition: service_healthy
+    backend:
+      build:
+        context: ./backend
+      ports:
+        - "8000:8000"
+      env_file:
+        - .env
+      volumes:
+        - ./backend:/app
+      command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+      depends_on:
+        db:
+          # THE FIX: Wait until Postgres is fully ready, not just turned on!
+          condition: service_healthy
 
-  db:
-    image: postgres:15-alpine
-    environment:
-      POSTGRES_USER: admin
-      POSTGRES_PASSWORD: secretpassword
-      POSTGRES_DB: learningbuddy
-    ports:
-      - "5432:5432"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    healthcheck:
-      # THE FIX: This command asks Postgres if it is ready to accept logins
-      test: ["CMD-SHELL", "pg_isready -U admin -d learningbuddy"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
+    db:
+      image: postgres:15-alpine
+      environment:
+        POSTGRES_USER: admin
+        POSTGRES_PASSWORD: secretpassword
+        POSTGRES_DB: learningbuddy
+      ports:
+        - "5432:5432"
+      volumes:
+        - postgres_data:/var/lib/postgresql/data
+      healthcheck:
+        # THE FIX: This command asks Postgres if it is ready to accept logins
+        test: ["CMD-SHELL", "pg_isready -U admin -d learningbuddy"]
+        interval: 5s
+        timeout: 5s
+        retries: 5
 
-volumes:
-  postgres_data:
+  volumes:
+    postgres_data:

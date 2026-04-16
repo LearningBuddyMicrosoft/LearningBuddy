@@ -1,7 +1,7 @@
 import time
-from document_chunker import DocumentChunker
-from quiz_generator import generate_multiple_questions_from_chunk
-from database_insertion import questions_to_models, save_questions
+from .document_chunker import DocumentChunker
+from .quiz_generator import generate_multiple_questions_from_chunk
+from .database_insertion import questions_to_models, save_questions
 
 
 def generate_and_store_quiz(pdf_path: str, session, topic_id: int, num_questions: int = 10):
