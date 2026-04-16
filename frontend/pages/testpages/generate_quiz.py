@@ -15,7 +15,7 @@ st.title("Generate a Quiz")
 st.caption("Select topics, configure your quiz, and let AI build it for you.")
 st.divider()
 
-@st.cache_data(show_spinner=False, ttl=60)
+@st.cache_data(show_spinner=False, ttl=30)
 def load_dashboard():
     return get_dashboard()
 

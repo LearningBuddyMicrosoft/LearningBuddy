@@ -7,7 +7,6 @@ if "quiz_data" not in st.session_state:
     st.session_state.quiz_data = None
 if "attempt_id" not in st.session_state:
     st.session_state.attempt_id = None
-
 # ── Register all pages explicitly so Streamlit finds them in the subdirectory ─
 # st.navigation() bypasses the automatic pages/ discovery and lets you point
 # to any file path relative to this script.

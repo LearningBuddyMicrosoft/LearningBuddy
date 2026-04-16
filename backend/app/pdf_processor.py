@@ -1,56 +1,51 @@
-import fitz
-from .quiz_generator import generate_question_from_chunk
+import time
+from document_chunker import DocumentChunker
+from quiz_generator import generate_multiple_questions_from_chunk
+from database_insertion import questions_to_models, save_questions
 
 
-def smart_chunk_by_headers(pdf_path: str) -> list[str]:
-    document = fitz.open(pdf_path)
-    chunks = []
-    current_title = "Introduction"
-    current_text = ""
+def generate_and_store_quiz(pdf_path: str, session, topic_id: int, num_questions: int = 10):
 
-    for page in document:
-        blocks = page.get_text("dict")["blocks"]
-        for block in blocks:
-            if "lines" not in block:
-                continue
-            for line in block["lines"]:
-                for span in line["spans"]:
-                    text = span["text"].strip()
-                    if not text:
-                        continue
-                    if span["size"] > 14:
-                        if current_text:
-                            chunks.append(f"--- SECTION: {current_title} ---\n{current_text}\n")
-                        current_title = text
-                        current_text = ""
-                    else:
-                        current_text += text + " "
+    print("🚀 STARTING QUIZ GENERATION")
+    print("PDF PATH:", pdf_path)
+    print("TOPIC ID:", topic_id)
 
-    if current_text:
-        chunks.append(f"--- SECTION: {current_title} ---\n{current_text}\n")
+    chunker = DocumentChunker(chunk_size=800, overlap_size=100)
+    chunks = chunker.chunk_file(pdf_path)
 
-    return chunks
+    print("📄 CHUNKS CREATED:", len(chunks))
 
+    if not chunks:
+        print("❌ No chunks extracted")
+        return
 
-def generate_quiz_from_pdf(pdf_path: str, num_questions: int = 10) -> list[dict]:
-    chunks = smart_chunk_by_headers(pdf_path)
+    all_questions = []
 
-    # Pick evenly spaced chunks so questions cover the whole PDF
-    step = max(1, len(chunks) // num_questions)
-    selected = chunks[::step][:num_questions]
+    questions_per_chunk = max(1, num_questions // len(chunks))
 
-    questions = []
-    for chunk in selected:
-        try:
-            q = generate_question_from_chunk(chunk)
+    for i, chunk in enumerate(chunks):
+        print(f"⚙️ Processing chunk {i+1}/{len(chunks)}")
 
-            if q.get("q") and len(q.get("options", [])) == 4 and q.get("answer"):
-                questions.append(q)
-            else:
-                print("⚠️ Skipped invalid question:", q)
+        llm_questions = generate_multiple_questions_from_chunk(
+            chunk,
+            num_questions=questions_per_chunk
+        )
 
-        except Exception as e:
-            print("❌ Error generating question:", e)
-            continue
+        print("🤖 LLM OUTPUT:", llm_questions)
 
-    return questions
+        all_questions.extend(llm_questions)
+
+        if len(all_questions) >= num_questions:
+            break
+
+    print("✅ TOTAL QUESTIONS GENERATED:", len(all_questions))
+
+    all_questions = all_questions[:num_questions]
+
+    db_objects = questions_to_models(all_questions, topic_id)
+
+    print("💾 SAVING TO DB:", len(db_objects))
+
+    save_questions(session, db_objects)
+
+    print(f"✅ Inserted {len(db_objects)} questions into DB")

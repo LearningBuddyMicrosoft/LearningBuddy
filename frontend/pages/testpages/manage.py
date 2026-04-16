@@ -1,12 +1,17 @@
 import os
 import tempfile
 import streamlit as st
+
+DATABASE_URL = os.getenv("DATABASE_URL")
+API_BASE_URL = os.getenv("BACKEND_URL", "http://localhost:8000")
+
 from api_client import (
     get_dashboard,
     create_subject,
     create_topic,
     upload_material,
     get_topic_details,
+    get_questions_by_topic,
 )
 
 if not st.session_state.get("token"):
@@ -28,6 +33,7 @@ def load_dashboard():
 
 def refresh():
     st.cache_data.clear()
+    st.cache_resource.clear()
     st.rerun()
 
 dashboard = load_dashboard()
@@ -125,7 +131,7 @@ with tab_upload:
             with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
                 tmp.write(uploaded_file.read())
                 tmp_path = tmp.name
-
+                
             with st.spinner("Uploading…"):
                 result = upload_material(tmp_path, uploaded_file.name, topic_id)
 
@@ -172,3 +178,28 @@ with tab_details:
                 st.json(details)
             else:
                 st.error("Could not load topic details.")
+
+        if st.button("Load Questions", use_container_width=True):
+            with st.spinner("Fetching questions..."):
+                questions = get_questions_by_topic(topic_id)
+                st.write(questions)
+            if questions is None:
+                st.error("Failed to fetch questions from backend")
+            elif len(questions) == 0:
+                st.warning("No questions found for this topic")
+            else:
+                st.success(f"Loaded {len(questions)} questions")
+
+                for q in questions:
+                    with st.container(border=True):
+                        st.markdown(f"### {q.get('question_text', 'No question text')}")
+                        st.markdown(f"**Difficulty:** {q.get('difficulty', 'N/A')}")
+                        st.markdown(f"**Type:** {q.get('question_type', 'N/A')}")
+
+                        options = q.get("options") or []
+                        if options:
+                            st.markdown("**Options:**")
+                            for opt in options:
+                                st.markdown(f"- {opt}")
+
+                        st.markdown(f"**Answer:** `{q.get('correct_answer', '')}`")             

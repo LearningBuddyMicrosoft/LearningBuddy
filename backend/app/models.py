@@ -1,7 +1,8 @@
 from typing import List, Optional
 from google.auth import default
+from requests import session
 from sqlmodel import SQLModel, Field, Relationship
-from sqlalchemy import JSON, Column
+from sqlalchemy import JSON, Column, select
 
 class User(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)

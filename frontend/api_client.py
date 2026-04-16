@@ -34,6 +34,7 @@ def register(username: str, password: str):
         return False, res.json().get("detail", "Registration failed")
     return False, "Could not reach server"
 
+
 def get_dashboard():
     res = api("GET", "/dashboard")
     if res and res.status_code == 200:
@@ -154,4 +155,16 @@ def finish_attempt(attempt_id: int):
         return res.json()
     elif res:
         st.error(res.json().get("detail", "Failed to finish attempt"))
+    return None
+
+def get_questions_by_topic(topic_id: int):
+    res = api("GET", f"/topics/{topic_id}/questions")
+
+    print("FETCHING:", f"{API_BASE_URL}/topics/{topic_id}/questions")
+    if res and res.status_code == 200:
+        return res.json()
+
+    if res:
+        st.error(res.json().get("detail", "Failed to load questions"))
+
     return None
