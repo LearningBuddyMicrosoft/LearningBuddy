@@ -1,4 +1,5 @@
 import os
+from typing import List
 
 from fastapi import FastAPI, Depends, File, Form, HTTPException, UploadFile, BackgroundTasks
 from fastapi.concurrency import asynccontextmanager
@@ -10,7 +11,7 @@ from .security import create_access_token, get_current_user, get_password_hash, 
 from .database import create_db_and_tables, get_session, engine
 from datetime import date
 from .models import Material, Question, Quiz, Response, Subject, Topic, User, QuizAttempt # From your previous steps
-from .schemas import DashboardRead, QuizCreate, QuizRead, SubjectCreate, TopicCreate, TopicDetailedRead, UserCreate, StartAttempt, AnswerSubmission, FinishAttempt, BatchSubmission
+from .schemas import DashboardRead, QuizAttemptsGroup, QuizCreate, QuizRead, SubjectCreate, TopicCreate, TopicDetailedRead, UserCreate, StartAttempt, AnswerSubmission, FinishAttempt, BatchSubmission
 
 
 
@@ -362,28 +363,34 @@ def start_quiz(quiz_id: int, session: Session = Depends(get_session), current_us
 
 #Called to get saved user Attempts(used to display past quiz attempts and scores)
 
-@app.get("/attempts/{attempt_id}")
-def get_attempt_detail(
-    attempt_id: int,
-    session: Session = Depends(get_session),
+@app.get("/attempts", response_model=List[QuizAttemptsGroup])
+def get_user_attempts(
+    session: Session = Depends(get_session), 
     current_user: User = Depends(get_current_user)
 ):
-    attempt = session.get(QuizAttempt, attempt_id)
-
-    if not attempt or attempt.user_id != current_user.id:
-        raise HTTPException(status_code=403)
-
-    return attempt
-
-@app.get("/attempts")
-def get_attempts(
-    session: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user)
-):
-    attempts = session.exec(
-        select(QuizAttempt)
+    statement = (
+        select(Quiz, QuizAttempt)
+        .join(QuizAttempt, QuizAttempt.quiz_id == Quiz.id)
         .where(QuizAttempt.user_id == current_user.id)
-        .order_by(QuizAttempt.id.desc())
-    ).all()
+    )
+    
+    results = session.exec(statement).all()
 
-    return attempts
+    # 2. THE GROUPING: Reorganize the flat SQL rows into our nested dictionary
+    grouped_data = {}
+
+    for quiz, attempt in results:
+        if quiz.id not in grouped_data:
+            grouped_data[quiz.id] = {
+                "quiz_id": quiz.id,
+                "quiz_name": quiz.name,
+                "attempts": []
+            }
+        
+        grouped_data[quiz.id]["attempts"].append({
+            "id": attempt.id,
+            "date": attempt.date,
+            "score": attempt.score
+        })
+
+    return list(grouped_data.values())
