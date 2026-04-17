@@ -1,126 +1,55 @@
-import re
-from ai.ollama_client import generate
+import json
+import requests
 
-FEW_SHOT = """Here are two example questions:
-
-Q: What does RAM stand for?
-A) Read Access Memory
-B) Random Access Memory
-C) Rapid Access Module
-D) Run Active Memory
-Answer: B
-Explanation: RAM stands for Random Access Memory, which is temporary storage the CPU uses to run programs.
-
-Q: Which protocol guarantees reliable delivery?
-A) UDP
-B) IP
-C) TCP
-D) DNS
-Answer: C
-Explanation: TCP (Transmission Control Protocol) uses acknowledgements and retransmission to guarantee delivery."""
-
-
-def generate_question_from_chunk(chunk: str) -> dict:
-    """Generate a SINGLE question from a chunk"""
-    prompt = f"""<|user|>
-You are a quiz generator for university students. Using ONLY the study text below, create one multiple choice question with exactly 4 options (A, B, C, D). One must be correct. Include a short explanation.
-
-{FEW_SHOT}
-
-Now generate one question from this text:
-{chunk[:1000]}
-
-Respond ONLY in plain text using EXACTLY this format. No extra words before or after:
-
-Q: [question]
-A) [option]
-B) [option]
-C) [option]
-D) [option]
-Answer: [A, B, C, or D]
-Explanation: [one sentence]
-<|end|>
-<|assistant|>"""
-
-    raw = generate(prompt)
-    return parse_question(raw, chunk)
+OLLAMA_URL = "http://host.docker.internal:11434"
 
 
 def generate_multiple_questions_from_chunk(chunk: str, num_questions: int = 3) -> list[dict]:
-    """Generate MULTIPLE questions from a single chunk"""
-    questions = []
-    
-    # Split chunk into sub-chunks if it's long enough
-    sentences = chunk.split(". ")
-    
-    for i in range(num_questions):
-        # Create a different sub-prompt for each question to get variety
-        start_idx = (i * len(sentences)) // num_questions
-        end_idx = ((i + 1) * len(sentences)) // num_questions
-        sub_chunk = ". ".join(sentences[start_idx:end_idx])
-        
-        if not sub_chunk.strip():
-            continue
-            
-        prompt = f"""<|user|>
-You are a quiz generator for university students. Using ONLY the study text below, create one multiple choice question with exactly 4 options (A, B, C, D). One must be correct. Include a short explanation.
+    """
+    Uses Ollama to generate structured quiz questions from a text chunk.
+    Returns list of dicts ready for DB insertion.
+    """
 
-IMPORTANT: This is question {i+1} of {num_questions}. Generate a DIFFERENT question than previous ones.
+    prompt = f"""
+You are a quiz generator.
 
-{FEW_SHOT}
+Generate exactly {num_questions} multiple-choice questions from the text below.
 
-Now generate one question from this text:
-{sub_chunk[:500]}
+RULES:
+- Output ONLY valid JSON
+- No explanations
+- No markdown
+- Must be a JSON list
+- Each item must follow this schema:
 
-Respond ONLY in plain text using EXACTLY this format. No extra words before or after:
+{{
+  "question_type": "MCQ",
+  "difficulty": 1-10,
+  "question_text": "...",
+  "options": ["A", "B", "C", "D"],
+  "correct_answer": "one of the options"
+}}
 
-Q: [question]
-A) [option]
-B) [option]
-C) [option]
-D) [option]
-Answer: [A, B, C, or D]
-Explanation: [one sentence]
-<|end|>
-<|assistant|>"""
+TEXT:
+\"\"\"{chunk}\"\"\"
+"""
 
-        try:
-            raw = generate(prompt)
-            q = parse_question(raw, chunk)
-            if q.get("q") and len(q.get("options", [])) == 4 and q.get("answer"):
-                questions.append(q)
-        except Exception as e:
-            print(f"Error generating question {i+1}: {e}")
-            continue
-    
-    return questions
+    response = requests.post(
+        f"{OLLAMA_URL}/api/generate", 
+        json={
+            "model": "llama3",
+            "prompt": prompt,
+            "stream": False
+        }
+    )
 
+    raw_text = response.json()["response"]
 
-def parse_question(raw: str, source_chunk: str) -> dict:
-    lines = [l.strip() for l in raw.strip().splitlines() if l.strip()]
-
-    question = ""
-    options = []
-    answer_letter = ""
-    explanation = ""
-
-    for line in lines:
-        if line.startswith("Q:"):
-            question = line[2:].strip()
-        elif re.match(r"^[A-D][\)\.]", line):
-            options.append(line[3:].strip())
-        elif line.startswith("Answer:"):
-            answer_letter = line.replace("Answer:", "").strip().upper()
-        elif line.startswith("Explanation:"):
-            explanation = line.replace("Explanation:", "").strip()
-
-    letter_map = {"A": 0, "B": 1, "C": 2, "D": 3}
-    answer_text = options[letter_map[answer_letter]] if answer_letter in letter_map and options else ""
-
-    return {
-        "q": question,
-        "options": options,
-        "answer": answer_text,
-        "explanation": explanation,
-        "source": source_chunk[:200]
-    }
+    try:
+        data = json.loads(raw_text)
+        if isinstance(data, dict):
+            data = [data]
+        return data
+    except Exception as e:
+        print("Failed to parse LLM output:", raw_text)
+        return []

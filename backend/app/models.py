@@ -1,5 +1,4 @@
 from typing import List, Optional
-from google.auth import default
 from sqlmodel import SQLModel, Field, Relationship
 from sqlalchemy import JSON, Column
 
