@@ -37,7 +37,7 @@ TEXT:
     response = requests.post(
         f"{OLLAMA_URL}/api/generate", 
         json={
-            "model": "llama3",
+            "model": "phi3.5",
             "prompt": prompt,
             "stream": False
         }
