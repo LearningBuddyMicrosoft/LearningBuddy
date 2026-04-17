@@ -116,3 +116,15 @@ class Response(SQLModel, table=True):
     selected_option: str
     is_correct: bool
     feedback: str
+
+class QuizAttempt(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+
+    user_id: int = Field(foreign_key="user.id")
+    quiz_id: int = Field(foreign_key="quiz.id")
+
+    date: str
+    score: int
+    feedback: str
+
+    quiz_snapshot: dict = Field(default_factory=dict, sa_column=Column(JSON))

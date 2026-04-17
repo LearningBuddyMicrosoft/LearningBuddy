@@ -168,3 +168,26 @@ def get_questions_by_topic(topic_id: int):
         st.error(res.json().get("detail", "Failed to load questions"))
 
     return None
+
+def get_attempts():
+    res = api("GET", "/attempts")
+
+    if res and res.status_code == 200:
+        return res.json()
+
+    if res:
+        st.error(res.json().get("detail", "Failed to load attempts"))
+
+    return []
+
+
+def get_attempt(attempt_id: int):
+    res = api("GET", f"/attempts/{attempt_id}")
+
+    if res and res.status_code == 200:
+        return res.json()
+
+    if res:
+        st.error(res.json().get("detail", "Failed to load attempt"))
+
+    return None

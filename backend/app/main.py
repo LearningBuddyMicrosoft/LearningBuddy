@@ -10,9 +10,9 @@ from .security import create_access_token, get_current_user, get_password_hash, 
 from .database import create_db_and_tables, get_session, engine
 from datetime import date
 from .models import Material, Question, Quiz, Response, Subject, Topic, User, QuizAttempt # From your previous steps
-from.schemas import DashboardRead, QuizCreate, QuizRead, SubjectCreate, TopicCreate, TopicDetailedRead, UserCreate, StartAttempt, AnswerSubmission, FinishAttempt, BatchSubmission
+from .schemas import DashboardRead, QuizCreate, QuizRead, SubjectCreate, TopicCreate, TopicDetailedRead, UserCreate, StartAttempt, AnswerSubmission, FinishAttempt, BatchSubmission
 
-app = FastAPI()
+
 
 '''
 #mastery logic will be discussed and updated later
@@ -85,7 +85,22 @@ def start_attempt(payload: StartAttempt, session: Session = Depends(get_session)
         quiz_id=payload.quiz_id,
         date=date.today().isoformat(),
         score=0,
-        feedback=""
+        feedback="",
+        
+
+        quiz_snapshot={
+        "quiz_name": quiz.name,
+        "difficulty": quiz.difficulty_level,
+        "questions": [
+            {
+                "id": q.id,
+                "text": q.question_text,
+                "options": q.options,
+                "correct_answer": q.correct_answer
+            }
+            for q in quiz.questions
+        ]
+    }
     )
     session.add(new_attempt)
     session.commit()
@@ -234,7 +249,7 @@ def create_topic(payload: TopicCreate, session: Session = Depends(get_session),c
     if not subject:
         raise HTTPException(status_code=404, detail="Subject not found")
     if subject.user_id != current_user.id:
-        raise HTTPException(status_code=403, detpiail="You do not have access to this subject")
+        raise HTTPException(status_code=403, detail="You do not have access to this subject")
     new_topic = Topic(
         subject_id=payload.subject_id,
         name=payload.name)
@@ -344,3 +359,31 @@ def start_quiz(quiz_id: int, session: Session = Depends(get_session), current_us
         raise HTTPException(status_code=403, detail="You do not have access to this quiz")
     quiz.questions
     return quiz
+
+#Called to get saved user Attempts(used to display past quiz attempts and scores)
+
+@app.get("/attempts/{attempt_id}")
+def get_attempt_detail(
+    attempt_id: int,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user)
+):
+    attempt = session.get(QuizAttempt, attempt_id)
+
+    if not attempt or attempt.user_id != current_user.id:
+        raise HTTPException(status_code=403)
+
+    return attempt
+
+@app.get("/attempts")
+def get_attempts(
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user)
+):
+    attempts = session.exec(
+        select(QuizAttempt)
+        .where(QuizAttempt.user_id == current_user.id)
+        .order_by(QuizAttempt.id.desc())
+    ).all()
+
+    return attempts
