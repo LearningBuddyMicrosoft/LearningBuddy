@@ -1,4 +1,5 @@
 import os
+from typing import List
 
 from fastapi import FastAPI, Depends, File, Form, HTTPException, UploadFile, BackgroundTasks
 from fastapi.concurrency import asynccontextmanager
@@ -12,9 +13,9 @@ from .security import create_access_token, get_current_user, get_password_hash, 
 from .database import create_db_and_tables, get_session, engine
 from datetime import date
 from .models import Material, Question, Quiz, Response, Subject, Topic, User, QuizAttempt # From your previous steps
-from.schemas import DashboardRead, QuizCreate, QuizRead, SubjectCreate, TopicCreate, TopicDetailedRead, UserCreate, StartAttempt, AnswerSubmission, FinishAttempt, BatchSubmission
+from .schemas import DashboardRead, QuizAttemptsGroup, QuizCreate, QuizRead, SubjectCreate, TopicCreate, TopicDetailedRead, UserCreate, StartAttempt, AnswerSubmission, FinishAttempt, BatchSubmission
 
-app = FastAPI()
+
 
 '''
 #mastery logic will be discussed and updated later
@@ -87,7 +88,22 @@ def start_attempt(payload: StartAttempt, session: Session = Depends(get_session)
         quiz_id=payload.quiz_id,
         date=date.today().isoformat(),
         score=0,
-        feedback=""
+        feedback="",
+        
+
+        quiz_snapshot={
+        "quiz_name": quiz.name,
+        "difficulty": quiz.difficulty_level,
+        "questions": [
+            {
+                "id": q.id,
+                "text": q.question_text,
+                "options": q.options,
+                "correct_answer": q.correct_answer
+            }
+            for q in quiz.questions
+        ]
+    }
     )
     session.add(new_attempt)
     session.commit()
@@ -236,7 +252,7 @@ def create_topic(payload: TopicCreate, session: Session = Depends(get_session),c
     if not subject:
         raise HTTPException(status_code=404, detail="Subject not found")
     if subject.user_id != current_user.id:
-        raise HTTPException(status_code=403, detpiail="You do not have access to this subject")
+        raise HTTPException(status_code=403, detail="You do not have access to this subject")
     new_topic = Topic(
         subject_id=payload.subject_id,
         name=payload.name)
@@ -361,78 +377,36 @@ def start_quiz(quiz_id: int, session: Session = Depends(get_session), current_us
     quiz.questions
     return quiz
 
-@app.delete("/subjects/{subject_id}")
-def delete_subject(subject_id: int, session: Session = Depends(get_session), current_user: User = Depends(get_current_user)):
-    subject = session.get(Subject, subject_id)
-    if not subject:
-        raise HTTPException(status_code=404, detail="Subject not found")
-    if subject.user_id != current_user.id:
-        raise HTTPException(status_code=403, detail="You do not have access to this subject")
-    for topic in subject.topics:
-        for material in topic.materials:
-            if material.file_path and os.path.exists(material.file_path):
-                try:
-                    os.remove(material.file_path)
-                except Exception as e:
-                    print(f"Failed to delete physical file {material.file_path}: {e}")
-    session.delete(subject)
-    session.commit()
-    return {"message": f"Subject '{subject.name}' successfully deleted."}
+#Called to get saved user Attempts(used to display past quiz attempts and scores)
 
-@app.delete("/topics/{topic_id}")
-def delete_topic(topic_id: int, session: Session = Depends(get_session), current_user: User = Depends(get_current_user)):
-    topic = session.get(Topic, topic_id)
-    if not topic:
-        raise HTTPException(status_code=404, detail="Topic not found")
-    if topic.subject.user_id != current_user.id:
-        raise HTTPException(status_code=403, detail="You do not have access to this topic")
-    for material in topic.materials:
-            if material.file_path and os.path.exists(material.file_path):
-                try:
-                    os.remove(material.file_path)
-                except Exception as e:
-                    print(f"Failed to delete physical file {material.file_path}: {e}")
-    session.delete(topic)
-    session.commit()
-    return {"message": f"Topic '{topic.name}' successfully deleted."}
-
-@app.delete("/quizzes/{quiz_id}")
-def delete_quiz(quiz_id: int, session: Session = Depends(get_session), current_user: User = Depends(get_current_user)):
-    quiz = session.get(Quiz, quiz_id)
-    if not quiz:
-        raise HTTPException(status_code=404, detail="Quiz not found")
-    if quiz.user_id != current_user.id:
-        raise HTTPException(status_code=403, detail="You do not have access to this quiz")
-    session.delete(quiz)
-    session.commit()
-    return {"message": f"Quiz '{quiz.name}' successfully deleted."}
-
-@app.delete("/materials/{material_id}")
-def delete_material(
-    material_id: int, 
+@app.get("/attempts", response_model=List[QuizAttemptsGroup])
+def get_user_attempts(
     session: Session = Depends(get_session), 
     current_user: User = Depends(get_current_user)
 ):
-    material = session.get(Material, material_id)
-    if not material:
-        raise HTTPException(status_code=404, detail="Material not found")
+    statement = (
+        select(Quiz, QuizAttempt)
+        .join(QuizAttempt, QuizAttempt.quiz_id == Quiz.id)
+        .where(QuizAttempt.user_id == current_user.id)
+    )
+    
+    results = session.exec(statement).all()
 
-    # SECURITY: Follow the chain up to the user (Material -> Topic -> Subject -> User)
-    if material.topic.subject.user_id != current_user.id:
-        raise HTTPException(status_code=403, detail="You do not have permission to delete this material")
+    # 2. THE GROUPING: Reorganize the flat SQL rows into our nested dictionary
+    grouped_data = {}
 
-    # 1. DELETE THE PHYSICAL FILE FIRST
-    # If the database delete fails later, it's better to have a ghost record 
-    # than a ghost file permanently eating up server space.
-    if material.file_path and os.path.exists(material.file_path):
-        try:
-            os.remove(material.file_path)
-        except Exception as e:
-            print(f"Failed to delete physical file {material.file_path}: {e}")
-            # Depending on your strictness, you could raise an HTTP error here
+    for quiz, attempt in results:
+        if quiz.id not in grouped_data:
+            grouped_data[quiz.id] = {
+                "quiz_id": quiz.id,
+                "quiz_name": quiz.name,
+                "attempts": []
+            }
+        
+        grouped_data[quiz.id]["attempts"].append({
+            "id": attempt.id,
+            "date": attempt.date,
+            "score": attempt.score
+        })
 
-    # 2. DELETE FROM DATABASE
-    session.delete(material)
-    session.commit()
-
-    return {"message": f"Material '{material.name}' successfully deleted."}
+    return list(grouped_data.values())

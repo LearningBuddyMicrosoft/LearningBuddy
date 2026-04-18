@@ -99,7 +99,7 @@ CONTEXT:
     response = requests.post(
         f"{OLLAMA_URL}/api/generate", 
         json={
-            "model": "qwen2.5",
+            "model": "phi3.5",
             "prompt": prompt,
             "stream": False,
             "options": {

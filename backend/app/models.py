@@ -95,7 +95,6 @@ class QuizAttempt(SQLModel, table=True):
     quiz: Quiz = Relationship(back_populates="attempts")
 
 
-
     date: str
     score: int
     feedback: str  # Linked to Mistake Analysis  
@@ -126,15 +125,3 @@ class Response(SQLModel, table=True):
     selected_option: str
     is_correct: bool
     feedback: str
-
-class DocumentChunk(SQLModel, table=True):
-    id: Optional[int] = Field(default=None, primary_key=True)
-    text_content: str  # The actual paragraph text from the PDF
-    
-    # This is the special pgvector column. 
-    # 768 is the specific dimension size for the nomic-embed-text model.
-    embedding: List[float] = Field(sa_column=Column(Vector(768))) 
-    
-    # The Foreign Key linking back to the Material
-    material_id: int = Field(foreign_key="material.id")
-    material: Material = Relationship(back_populates="chunks")
