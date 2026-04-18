@@ -169,25 +169,34 @@ def get_questions_by_topic(topic_id: int):
 
     return None
 
-def get_attempts():
-    res = api("GET", "/attempts")
-
+def delete_subject(subject_id: int):
+    res = api("DELETE", f"/subjects/{subject_id}")
     if res and res.status_code == 200:
-        return res.json()
+        return True
+    elif res:
+        st.error(res.json().get("detail", "Failed to delete subject"))
+    return False
 
-    if res:
-        st.error(res.json().get("detail", "Failed to load attempts"))
-
-    return []
-
-
-def get_attempt(attempt_id: int):
-    res = api("GET", f"/attempts/{attempt_id}")
-
+def delete_topic(topic_id: int):
+    res = api("DELETE", f"/topics/{topic_id}")
     if res and res.status_code == 200:
-        return res.json()
+        return True
+    elif res:
+        st.error(res.json().get("detail", "Failed to delete topic"))
+    return False
 
-    if res:
-        st.error(res.json().get("detail", "Failed to load attempt"))
+def delete_quiz(quiz_id: int):
+    res = api("DELETE", f"/quizzes/{quiz_id}")
+    if res and res.status_code == 200:
+        return True
+    elif res:
+        st.error(res.json().get("detail", "Failed to delete quiz"))
+    return False
 
-    return None
+def delete_material(material_id: int):
+    res = api("DELETE", f"/materials/{material_id}")
+    if res and res.status_code == 200:
+        return True
+    elif res:
+        st.error(res.json().get("detail", "Failed to delete material"))
+    return False
