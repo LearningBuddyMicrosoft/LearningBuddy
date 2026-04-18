@@ -168,3 +168,35 @@ def get_questions_by_topic(topic_id: int):
         st.error(res.json().get("detail", "Failed to load questions"))
 
     return None
+
+def delete_subject(subject_id: int):
+    res = api("DELETE", f"/subjects/{subject_id}")
+    if res and res.status_code == 200:
+        return True
+    elif res:
+        st.error(res.json().get("detail", "Failed to delete subject"))
+    return False
+
+def delete_topic(topic_id: int):
+    res = api("DELETE", f"/topics/{topic_id}")
+    if res and res.status_code == 200:
+        return True
+    elif res:
+        st.error(res.json().get("detail", "Failed to delete topic"))
+    return False
+
+def delete_quiz(quiz_id: int):
+    res = api("DELETE", f"/quizzes/{quiz_id}")
+    if res and res.status_code == 200:
+        return True
+    elif res:
+        st.error(res.json().get("detail", "Failed to delete quiz"))
+    return False
+
+def delete_material(material_id: int):
+    res = api("DELETE", f"/materials/{material_id}")
+    if res and res.status_code == 200:
+        return True
+    elif res:
+        st.error(res.json().get("detail", "Failed to delete material"))
+    return False

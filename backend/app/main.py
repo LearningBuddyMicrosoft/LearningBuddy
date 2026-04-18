@@ -344,3 +344,79 @@ def start_quiz(quiz_id: int, session: Session = Depends(get_session), current_us
         raise HTTPException(status_code=403, detail="You do not have access to this quiz")
     quiz.questions
     return quiz
+
+@app.delete("/subjects/{subject_id}")
+def delete_subject(subject_id: int, session: Session = Depends(get_session), current_user: User = Depends(get_current_user)):
+    subject = session.get(Subject, subject_id)
+    if not subject:
+        raise HTTPException(status_code=404, detail="Subject not found")
+    if subject.user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="You do not have access to this subject")
+    for topic in subject.topics:
+        for material in topic.materials:
+            if material.file_path and os.path.exists(material.file_path):
+                try:
+                    os.remove(material.file_path)
+                except Exception as e:
+                    print(f"Failed to delete physical file {material.file_path}: {e}")
+    session.delete(subject)
+    session.commit()
+    return {"message": f"Subject '{subject.name}' successfully deleted."}
+
+@app.delete("/topics/{topic_id}")
+def delete_topic(topic_id: int, session: Session = Depends(get_session), current_user: User = Depends(get_current_user)):
+    topic = session.get(Topic, topic_id)
+    if not topic:
+        raise HTTPException(status_code=404, detail="Topic not found")
+    if topic.subject.user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="You do not have access to this topic")
+    for material in topic.materials:
+            if material.file_path and os.path.exists(material.file_path):
+                try:
+                    os.remove(material.file_path)
+                except Exception as e:
+                    print(f"Failed to delete physical file {material.file_path}: {e}")
+    session.delete(topic)
+    session.commit()
+    return {"message": f"Topic '{topic.name}' successfully deleted."}
+
+@app.delete("/quizzes/{quiz_id}")
+def delete_quiz(quiz_id: int, session: Session = Depends(get_session), current_user: User = Depends(get_current_user)):
+    quiz = session.get(Quiz, quiz_id)
+    if not quiz:
+        raise HTTPException(status_code=404, detail="Quiz not found")
+    if quiz.user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="You do not have access to this quiz")
+    session.delete(quiz)
+    session.commit()
+    return {"message": f"Quiz '{quiz.name}' successfully deleted."}
+
+@app.delete("/materials/{material_id}")
+def delete_material(
+    material_id: int, 
+    session: Session = Depends(get_session), 
+    current_user: User = Depends(get_current_user)
+):
+    material = session.get(Material, material_id)
+    if not material:
+        raise HTTPException(status_code=404, detail="Material not found")
+
+    # SECURITY: Follow the chain up to the user (Material -> Topic -> Subject -> User)
+    if material.topic.subject.user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="You do not have permission to delete this material")
+
+    # 1. DELETE THE PHYSICAL FILE FIRST
+    # If the database delete fails later, it's better to have a ghost record 
+    # than a ghost file permanently eating up server space.
+    if material.file_path and os.path.exists(material.file_path):
+        try:
+            os.remove(material.file_path)
+        except Exception as e:
+            print(f"Failed to delete physical file {material.file_path}: {e}")
+            # Depending on your strictness, you could raise an HTTP error here
+
+    # 2. DELETE FROM DATABASE
+    session.delete(material)
+    session.commit()
+
+    return {"message": f"Material '{material.name}' successfully deleted."}

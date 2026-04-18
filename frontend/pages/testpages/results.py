@@ -25,39 +25,28 @@ if not attempt_id:
 
 st.success("Your attempt has been submitted and recorded!")
 
-col1, col2 = st.columns(2)
-col1.metric("Quiz", quiz_name)
-col2.metric("Answers submitted", answers_count)
+# 1. Grab the graded data we saved in the previous step
+result_data = st.session_state.get("last_quiz_result")
+
+if result_data:
+    # 2. Display the top-level metrics
+    col1, col2 = st.columns(2)
+    col1.metric("Quiz", quiz_name)
+    
+    # Assuming your backend returned the score in the JSON package!
+    score = result_data.get("score", 0) 
+    col2.metric("Final Score", score)
+
+    st.divider()
+    
+    # 3. Display the detailed AI feedback!
+    st.subheader("Detailed Feedback")
+    st.write(result_data.get("feedback", "No feedback provided."))
+    
+else:
+    st.warning("Could not load detailed results. Please try taking the quiz again.")
 
 st.divider()
-
-# ── TODO: Detailed results ────────────────────────────────────────────────────
-# Once your /end-quiz endpoint is ready, call it here with `attempt_id` to fetch
-# per-question feedback and render it.
-#
-# Suggested shape to handle:
-#   result = get_quiz_results(attempt_id)   # add to api_client.py
-#   {
-#       "score": 7,
-#       "total": 10,
-#       "questions": [
-#           {
-#               "id": 1,
-#               "text": "...",
-#               "student_answer": "B",
-#               "correct_answer": "A",
-#               "is_correct": False,
-#               "explanation": "...",
-#               "topic_reference": "Section 3.2",
-#           },
-#           ...
-#       ]
-#   }
-
-st.info(
-    "Detailed per-question feedback will appear here once the `/end-quiz` endpoint "
-    "is implemented. Your attempt has been saved and will count towards progress tracking."
-)
 
 st.divider()
 col_a, col_b = st.columns(2)
