@@ -16,7 +16,15 @@ class DocumentChunker:
                 reader = PyPDF2.PdfReader(file)
                 text = ""
                 for page in reader.pages:
-                    text += page.extract_text() + " "
+                    # PyPDF2 sometimes returns None for empty pages, 
+                    # so we ensure it's a string before adding
+                    extracted = page.extract_text()
+                    if extracted:
+                        text += extracted + " "
+                
+                # 🌟 THE SANITY CHECK 🌟
+                print(f"📄 Extracted a total of {len(text)} characters from the PDF.")
+                
                 chunks.extend(self._chunk_text(text))
         except Exception as e:
             print(f"Error processing PDF: {e}")

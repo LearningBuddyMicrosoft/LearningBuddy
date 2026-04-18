@@ -29,7 +29,7 @@
           condition: service_healthy
 
     db:
-      image: postgres:15-alpine
+      image: pgvector/pgvector:pg15
       environment:
         POSTGRES_USER: admin
         POSTGRES_PASSWORD: secretpassword

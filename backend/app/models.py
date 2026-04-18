@@ -1,6 +1,7 @@
 from typing import List, Optional
 from sqlmodel import SQLModel, Field, Relationship
 from sqlalchemy import JSON, Column
+from pgvector.sqlalchemy import Vector
 
 class User(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
@@ -20,7 +21,9 @@ class Subject(SQLModel, table=True):
     user_id:int = Field(foreign_key="user.id")
     user: User = Relationship(back_populates="subjects")
 
-    topics: List["Topic"] = Relationship(back_populates="subject")
+    topics: List["Topic"] = Relationship(
+        back_populates="subject",
+        sa_relationship_kwargs={"cascade": "all, delete-orphan"})
 
     name: str
 
@@ -33,9 +36,15 @@ class Topic(SQLModel, table=True):
 
     subject_id: int = Field(foreign_key="subject.id")
     subject: Subject = Relationship(back_populates="topics")
-    materials: List["Material"] = Relationship(back_populates="topic")
-    quiz_questions: List["Question"] = Relationship(back_populates="topic")
-    quizzes: List["Quiz"] = Relationship(back_populates="topics", link_model=Quiz_TopicLink)
+    materials: List["Material"] = Relationship(
+        back_populates="topic",
+        sa_relationship_kwargs={"cascade": "all, delete-orphan"})
+    quiz_questions: List["Question"] = Relationship(
+        back_populates="topic",
+        sa_relationship_kwargs={"cascade": "all, delete-orphan"})
+    quizzes: List["Quiz"] = Relationship(
+        back_populates="topics",
+        link_model=Quiz_TopicLink)
 
 
     name: str
@@ -96,6 +105,7 @@ class Material(SQLModel, table=True):
 
     topic_id: int = Field(foreign_key="topic.id")
     topic: Topic = Relationship(back_populates="materials")
+    chunks: List["DocumentChunk"] = Relationship(back_populates="material")
 
     name: str
     file_path: str
