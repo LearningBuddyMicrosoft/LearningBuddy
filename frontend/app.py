@@ -18,10 +18,7 @@ pg = st.navigation(
         st.Page("pages/testpages/generate_quiz.py", title="Generate Quiz", url_path="generate-quiz"),
         st.Page("pages/testpages/take_quiz.py",     title="Take Quiz",     url_path="take-quiz"),
         st.Page("pages/testpages/results.py",       title="Results",       url_path="results"),
-
-        st.Page("pages/testpages/attempts.py",       title="Past Attempts",   url_path="attempts"),
-        st.Page("pages/testpages/attempt_review.py", title="Review Attempt",  url_path="attempt-review"),
     ],
-    position="sidebar",  # hides the default sidebar nav; each page manages its own navigation
+    position="hidden",  # hides the default sidebar nav; each page manages its own navigation
 )
 pg.run()

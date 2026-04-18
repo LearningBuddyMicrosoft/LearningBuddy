@@ -80,13 +80,3 @@ class QuizRead(SQLModel):
     length: int
     highscore: int
     questions: List[QuestionRead] = []
-
-class AttemptDetail(BaseModel):
-    id: int
-    date: str
-    score: int
-
-class QuizAttemptsGroup(BaseModel):
-    quiz_id: int
-    quiz_name: str
-    attempts: List[AttemptDetail]
