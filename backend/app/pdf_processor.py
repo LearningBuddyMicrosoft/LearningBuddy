@@ -1,51 +1,57 @@
-import time
+import os
+from typing import List
+import requests
 from .document_chunker import DocumentChunker
-from .quiz_generator import generate_multiple_questions_from_chunk
-from .database_insertion import questions_to_models, save_questions
 
+OLLAMA_URL = os.getenv("OLLAMA_URL")
 
-def generate_and_store_quiz(pdf_path: str, session, topic_id: int, num_questions: int = 10):
-
-    print("🚀 STARTING QUIZ GENERATION")
-    print("PDF PATH:", pdf_path)
-    print("TOPIC ID:", topic_id)
-
-    chunker = DocumentChunker(chunk_size=800, overlap_size=100)
+def get_embedding(text: str, model: str = "nomic-embed-text") -> List[float]:
+    """
+    Sends a chunk of text to Ollama's embedding API 
+    and returns a 768-dimension vector array.
+    """
+    url = f"{OLLAMA_URL}/api/embeddings"
+    
+    payload = {
+        "model": model,
+        "prompt": text,
+        "options": {
+            "num_ctx": 8192  # Expand memory to Nomic's true maximum
+        },
+        "truncate": True # 🌟 CRITICAL: Tells Ollama to truncate instead of crashing!
+    }
+    
+    try:
+        response = requests.post(url, json=payload)
+        response.raise_for_status()  # Safely catch HTTP errors like 404 or 500
+        
+        # Ollama returns a JSON dictionary like: {"embedding": [0.12, -0.05, ...]}
+        data = response.json()
+        return data.get("embedding", [])
+        
+    except requests.exceptions.RequestException as e:
+        print(f"❌ Failed to generate embedding: {e}")
+        return []
+    
+def generate_chunks_and_embeddings(pdf_path: str) -> List[dict]:
+    """
+    Combines chunking and embedding generation for a PDF file.
+    Returns a list of dicts with 'text_content' and 'embedding'.
+    """
+    chunker = DocumentChunker(chunk_size=200, overlap_size=40)
     chunks = chunker.chunk_file(pdf_path)
 
-    print("📄 CHUNKS CREATED:", len(chunks))
-
-    if not chunks:
-        print("❌ No chunks extracted")
-        return
-
-    all_questions = []
-
-    questions_per_chunk = max(1, num_questions // len(chunks))
-
+    results = []
+    
     for i, chunk in enumerate(chunks):
-        print(f"⚙️ Processing chunk {i+1}/{len(chunks)}")
-
-        llm_questions = generate_multiple_questions_from_chunk(
-            chunk,
-            num_questions=questions_per_chunk
-        )
-
-        print("🤖 LLM OUTPUT:", llm_questions)
-
-        all_questions.extend(llm_questions)
-
-        if len(all_questions) >= num_questions:
-            break
-
-    print("✅ TOTAL QUESTIONS GENERATED:", len(all_questions))
-
-    all_questions = all_questions[:num_questions]
-
-    db_objects = questions_to_models(all_questions, topic_id)
-
-    print("💾 SAVING TO DB:", len(db_objects))
-
-    save_questions(session, db_objects)
-
-    print(f"✅ Inserted {len(db_objects)} questions into DB")
+        print(f"⚙️ Processing chunk {i+1}/{len(chunks)} for embedding")
+        embedding = get_embedding(chunk)
+        if embedding: 
+            results.append({
+                "text_content": chunk,
+                "embedding": embedding
+            })
+        else:
+            print(f"⚠️ Skipping chunk {i+1} because embedding failed.")
+    
+    return results

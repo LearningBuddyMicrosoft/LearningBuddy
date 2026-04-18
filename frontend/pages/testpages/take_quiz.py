@@ -102,32 +102,34 @@ with col_cancel:
         st.switch_page("pages/testpages/dashboard.py")
 
 if do_submit:
+    # 1. Build the payload
     answers_payload = [
         {"attempt_id": attempt_id, "question_id": qid, "selected_option": answer}
         for qid, answer in st.session_state.quiz_answers.items()
         if answer
     ]
 
-    with st.spinner("Submitting your answers…"):
+    # 2. Call the single, unified submission endpoint
+    with st.spinner("Submitting and grading your answers…"):
+        # Assuming your helper function is updated to match your backend payload
         batch_result = submit_batch_answers(attempt_id, answers_payload)
 
     if batch_result is None:
         st.error("Failed to submit answers. Please try again.")
         st.stop()
 
-    with st.spinner("Finishing attempt…"):
-        finish_result = finish_attempt(attempt_id)
-
-    if finish_result is None:
-        st.error("Failed to finalise attempt. Please try again.")
-        st.stop()
-
+    # 3. THE CRUCIAL HAND-OFF: Save the graded result data for the Results page!
+    st.session_state.last_quiz_result = batch_result 
+    
+    # Save the basic metadata
     st.session_state.last_attempt_id = attempt_id
     st.session_state.last_quiz_name = quiz_name
     st.session_state.last_answers_count = len(answers_payload)
 
+    # 4. Clean up the active quiz memory
     st.session_state.quiz_data = None
     st.session_state.attempt_id = None
     st.session_state.quiz_answers = {}
 
+    # 5. Jump to the results page!
     st.switch_page("pages/testpages/results.py")

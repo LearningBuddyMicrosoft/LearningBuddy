@@ -5,8 +5,10 @@ from fastapi import FastAPI, Depends, File, Form, HTTPException, UploadFile, Bac
 from fastapi.concurrency import asynccontextmanager
 from sqlmodel import Session, select, func
 
-from .pdf_processor import generate_and_store_quiz
+from .database_insertion import store_document_embeddings
 
+from .pdf_processor import  generate_chunks_and_embeddings
+from .quiz_generator import generate_and_store_quiz
 from .security import create_access_token, get_current_user, get_password_hash, verify_password
 from .database import create_db_and_tables, get_session, engine
 from datetime import date
@@ -260,17 +262,31 @@ def create_topic(payload: TopicCreate, session: Session = Depends(get_session),c
     return new_topic
 
 
-def process_pdf_in_background(file_path: str, topic_id: int):
+def process_pdf_in_background(file_path: str, topic_id: int, material_id: int):
     with Session(engine) as background_session:
         try:
+            # 1. AI Layer: Extract text and vectors
+            chunk_results = generate_chunks_and_embeddings(file_path)
+            
+            # 2. Database Layer: Save the results
+            store_document_embeddings(
+                chunk_results=chunk_results, 
+                material_id=material_id, 
+                session=background_session
+            )
+            
+            # 2. THEN, generate the quiz (Generation)
+            print("📝 Step 2: Generating quiz based on stored knowledge...")
             generate_and_store_quiz(
-                pdf_path=file_path, 
                 session=background_session, 
                 topic_id=topic_id, 
-                num_questions=10 # Adjust if needed
+                material_id=material_id, # Pass the material_id instead of pdf_path!
+                num_questions=10 
             )
+            
         except Exception as e:
             print(f"❌ Background AI Task Failed: {e}")
+            background_session.rollback()
             
 @app.post("/materials/upload")
 def add_material(background_tasks: BackgroundTasks, topic_id: int = Form(...), file: UploadFile = File(...), session: Session = Depends(get_session),current_user: User = Depends(get_current_user)):
@@ -297,7 +313,7 @@ def add_material(background_tasks: BackgroundTasks, topic_id: int = Form(...), f
     session.commit()
     session.refresh(new_material)
 
-    background_tasks.add_task(process_pdf_in_background, file_path, topic_id)
+    background_tasks.add_task(process_pdf_in_background, file_path, topic_id, new_material.id)
 
     return new_material
 
