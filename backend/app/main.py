@@ -1,4 +1,5 @@
 import os
+from typing import List
 
 from fastapi import FastAPI, Depends, File, Form, HTTPException, UploadFile, BackgroundTasks
 from fastapi.concurrency import asynccontextmanager
@@ -12,7 +13,7 @@ from .security import create_access_token, get_current_user, get_password_hash, 
 from .database import create_db_and_tables, get_session, engine
 from datetime import date
 from .models import Material, Question, Quiz, Response, Subject, Topic, User, QuizAttempt # From your previous steps
-from.schemas import DashboardRead, QuizCreate, QuizRead, SubjectCreate, TopicCreate, TopicDetailedRead, UserCreate, StartAttempt, AnswerSubmission, FinishAttempt, BatchSubmission
+from.schemas import DashboardRead, QuizAttemptsGroup, QuizCreate, QuizRead, SubjectCreate, TopicCreate, TopicDetailedRead, UserCreate, StartAttempt, AnswerSubmission, FinishAttempt, BatchSubmission
 
 app = FastAPI()
 
@@ -436,3 +437,31 @@ def delete_material(
     session.commit()
 
     return {"message": f"Material '{material.name}' successfully deleted."}
+
+@app.get("/attempts", response_model=List[QuizAttemptsGroup])
+def get_user_attempts(
+    session: Session = Depends(get_session), 
+    current_user: User = Depends(get_current_user)):
+    
+    statement = (
+        select(Quiz, QuizAttempt)
+        .join(QuizAttempt, QuizAttempt.quiz_id == Quiz.id)
+        .where(QuizAttempt.user_id == current_user.id)
+    )
+    
+    results = session.exec(statement).all()
+    grouped_data = {}
+    for quiz, attempt in results:
+        if quiz.id not in grouped_data:
+            grouped_data[quiz.id] = {
+                "quiz_id": quiz.id,
+                "quiz_name": quiz.name,
+                "attempts": []
+            }
+        
+        grouped_data[quiz.id]["attempts"].append({
+            "id": attempt.id,
+            "date": attempt.date,
+            "score": attempt.score
+        })
+    return list(grouped_data.values())
