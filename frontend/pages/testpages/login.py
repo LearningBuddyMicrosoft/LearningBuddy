@@ -1,5 +1,7 @@
 import streamlit as st
 from api_client import login, register
+from pages.testpages.styles1 import apply_custom_css
+apply_custom_css()
 
 st.set_page_config(page_title="Login – Learning Buddy", page_icon="🎓", layout="centered")
 

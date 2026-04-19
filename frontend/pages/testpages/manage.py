@@ -1,7 +1,8 @@
 import os
 import tempfile
 import streamlit as st
-
+from pages.testpages.styles1 import apply_custom_css
+apply_custom_css()
 DATABASE_URL = os.getenv("DATABASE_URL")
 API_BASE_URL = os.getenv("BACKEND_URL", "http://localhost:8000")
 
@@ -23,9 +24,18 @@ with st.sidebar:
     if st.button("Log Out", use_container_width=True):
         st.session_state.token = None
         st.switch_page("pages/testpages/login.py")
-
-st.title("Manage Subjects & Topics")
-st.divider()
+st.markdown("""
+<style>
+.block-container {
+    padding-top: 2.5rem; 
+}
+</style>
+""", unsafe_allow_html=True)#removes top padding above logo
+st.markdown("Manage") 
+col1,col2,col3=st.columns([1,1,1])
+with col2:
+    st.image("logo.png",width=400)
+st.markdown("<hr style='margin:0.2rem 0; border:1px solid #eee'>", unsafe_allow_html=True)
 
 @st.cache_data(show_spinner=False, ttl=30)
 def load_dashboard():
@@ -64,19 +74,25 @@ with tab_subjects:
             else:
                 st.error(err)
 
-    st.divider()
-    st.subheader("Existing Subjects")
+    st.markdown("<hr style='margin:0.2rem 0; border:1px solid #eee'>", unsafe_allow_html=True)
+    st.markdown("### Existing Subjects")
     if not subjects:
         st.info("No subjects yet.")
     else:
-        for s in subjects:
-            st.markdown(f"- **{s['name']}** (ID: {s['id']})")
+
+        cols = st.columns(3)
+
+        for i, subject in enumerate(subjects):
+            topics = subject.get("topics", [])
+
+            with cols[i % 3]:
+                st.markdown(f"- **{subject['name']}**")
 
 # ════════════════════════════════════════════════════════════════════════════
 # TAB 2 — Topics
 # ════════════════════════════════════════════════════════════════════════════
 with tab_topics:
-    st.subheader("Create a New Topic")
+    st.markdown("### Create a New Topic")
 
     if not subjects:
         st.warning("Create a subject first before adding topics.")
@@ -99,7 +115,7 @@ with tab_topics:
                 else:
                     st.error(err)
 
-        st.divider()
+        st.markdown("<hr style='margin:0.2rem 0; border:1px solid #eee'>", unsafe_allow_html=True)
         st.subheader("Existing Topics by Subject")
         for s in subjects:
             with st.expander(f"{s['name']}"):
@@ -107,7 +123,7 @@ with tab_topics:
                     st.caption("No topics yet.")
                 else:
                     for t in s["topics"]:
-                        st.markdown(f"- **{t['name']}** (ID: {t['id']})")
+                        st.markdown(f"- **{t['name']}** ")
 
 # ════════════════════════════════════════════════════════════════════════════
 # TAB 3 — Upload Material
