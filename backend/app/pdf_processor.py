@@ -1,83 +1,57 @@
-import fitz  # PyMuPDF
-import time
-from langchain_core.documents import Document
-from langchain_text_splitters import RecursiveCharacterTextSplitter
+import os
+from typing import List
+import requests
+from .document_chunker import DocumentChunker
 
+OLLAMA_URL = os.getenv("OLLAMA_URL")
 
-from .quiz_generator import generate_question_from_chunk
-
-def chunk_by_slide(file_path: str) -> list[str]:
-    print(f"\nReading {file_path}...")
-    start_time = time.time()
-    documents = []
+def get_embedding(text: str, model: str = "nomic-embed-text") -> List[float]:
+    """
+    Sends a chunk of text to Ollama's embedding API 
+    and returns a 768-dimension vector array.
+    """
+    url = f"{OLLAMA_URL}/api/embeddings"
+    
+    payload = {
+        "model": model,
+        "prompt": text,
+        "options": {
+            "num_ctx": 8192  # Expand memory to Nomic's true maximum
+        },
+        "truncate": True # 🌟 CRITICAL: Tells Ollama to truncate instead of crashing!
+    }
     
     try:
-        doc = fitz.open(file_path)
-        for page_num, page in enumerate(doc):
-            text = page.get_text().strip()
-            
-            if text: 
-                metadata = {
-                    "page_number": page_num + 1,
-                    "source": file_path
-                }
-                documents.append(Document(page_content=text, metadata=metadata))
+        response = requests.post(url, json=payload)
+        response.raise_for_status()  # Safely catch HTTP errors like 404 or 500
         
-        doc.close()
-                
-    except Exception as e:
-        print(f"Error opening PDF: {e}")
+        # Ollama returns a JSON dictionary like: {"embedding": [0.12, -0.05, ...]}
+        data = response.json()
+        return data.get("embedding", [])
+        
+    except requests.exceptions.RequestException as e:
+        print(f"❌ Failed to generate embedding: {e}")
         return []
-
-    print(f"PDF read and extracted in {time.time() - start_time:.2f} seconds.")
     
-    split_start = time.time()
-    safety_splitter = RecursiveCharacterTextSplitter(
-        chunk_size=3000,
-        chunk_overlap=200,
-        length_function=len,
-        separators=["\n\n", "\n", " ", ""] 
-    )
+def generate_chunks_and_embeddings(pdf_path: str) -> List[dict]:
+    """
+    Combines chunking and embedding generation for a PDF file.
+    Returns a list of dicts with 'text_content' and 'embedding'.
+    """
+    chunker = DocumentChunker(chunk_size=200, overlap_size=40)
+    chunks = chunker.chunk_file(pdf_path)
+
+    results = []
     
-    final_chunks = safety_splitter.split_documents(documents)
-    print(f"Text split by LangChain in {time.time() - split_start:.2f} seconds.")
+    for i, chunk in enumerate(chunks):
+        print(f"⚙️ Processing chunk {i+1}/{len(chunks)} for embedding")
+        embedding = get_embedding(chunk)
+        if embedding: 
+            results.append({
+                "text_content": chunk,
+                "embedding": embedding
+            })
+        else:
+            print(f"⚠️ Skipping chunk {i+1} because embedding failed.")
     
-    string_chunks = []
-    for chunk in final_chunks:
-        slide_num = chunk.metadata.get("page_number", "Unknown")
-        formatted_text = f"--- SLIDE {slide_num} ---\n{chunk.page_content}\n"
-        string_chunks.append(formatted_text)
-        
-    return string_chunks
-
-
-def generate_quiz_from_pdf(pdf_path: str, num_questions: int = 10) -> list[dict]:
-    overall_start = time.time()
-    chunks = chunk_by_slide(pdf_path)
-
-    step = max(1, len(chunks) // num_questions) if chunks else 1
-    selected = chunks[::step][:num_questions]
-
-    questions = []
-    print(f"\nStarting question generation for {len(selected)} chunks...")
-    
-    for i, chunk in enumerate(selected):
-        chunk_start = time.time()
-        print(f"Generating question {i+1}/{len(selected)}... (Chunk length: {len(chunk)} chars)")
-        
-        try:
-            q = generate_question_from_chunk(chunk)
-
-            if q.get("q") and len(q.get("options", [])) == 4 and q.get("answer"):
-                questions.append(q)
-            else:
-                print("Skipped invalid question")
-
-        except Exception as e:
-            print("Error generating question:", e)
-            continue
-            
-        print(f"Question {i+1} finished in {time.time() - chunk_start:.2f} seconds.")
-
-    print(f"\nTotal process took {time.time() - overall_start:.2f} seconds.")
-    return questions
+    return results

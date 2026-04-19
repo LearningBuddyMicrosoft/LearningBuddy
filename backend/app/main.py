@@ -1,15 +1,19 @@
 import os
+from typing import List
 
-from fastapi import FastAPI, Depends, File, Form, HTTPException, UploadFile, APIRouter
+from fastapi import FastAPI, Depends, File, Form, HTTPException, UploadFile, BackgroundTasks
 from fastapi.concurrency import asynccontextmanager
-from requests import session
 from sqlmodel import Session, select, func
 
+from .database_insertion import store_document_embeddings
+
+from .pdf_processor import  generate_chunks_and_embeddings
+from .quiz_generator import generate_and_store_quiz
 from .security import create_access_token, get_current_user, get_password_hash, verify_password
-from .database import create_db_and_tables, get_session
+from .database import create_db_and_tables, get_session, engine
 from datetime import date
 from .models import Material, Question, Quiz, Response, Subject, Topic, User, QuizAttempt # From your previous steps
-from.schemas import DashboardRead, QuizCreate, QuizRead, SubjectCreate, TopicCreate, TopicDetailedRead, UserCreate, StartAttempt, AnswerSubmission, FinishAttempt, BatchSubmission
+from.schemas import DashboardRead, QuizAttemptsGroup, QuizCreate, QuizRead, SubjectCreate, TopicCreate, TopicDetailedRead, UserCreate, StartAttempt, AnswerSubmission, FinishAttempt, BatchSubmission
 
 app = FastAPI()
 
@@ -242,8 +246,35 @@ def create_topic(payload: TopicCreate, session: Session = Depends(get_session),c
     session.refresh(new_topic)
     return new_topic
 
+
+def process_pdf_in_background(file_path: str, topic_id: int, material_id: int):
+    with Session(engine) as background_session:
+        try:
+            # 1. AI Layer: Extract text and vectors
+            chunk_results = generate_chunks_and_embeddings(file_path)
+            
+            # 2. Database Layer: Save the results
+            store_document_embeddings(
+                chunk_results=chunk_results, 
+                material_id=material_id, 
+                session=background_session
+            )
+            
+            # 2. THEN, generate the quiz (Generation)
+            print("📝 Step 2: Generating quiz based on stored knowledge...")
+            generate_and_store_quiz(
+                session=background_session, 
+                topic_id=topic_id, 
+                material_id=material_id, # Pass the material_id instead of pdf_path!
+                num_questions=10 
+            )
+            
+        except Exception as e:
+            print(f"❌ Background AI Task Failed: {e}")
+            background_session.rollback()
+            
 @app.post("/materials/upload")
-def add_material(topic_id: int = Form(...), file: UploadFile = File(...), session: Session = Depends(get_session),current_user: User = Depends(get_current_user)):
+def add_material(background_tasks: BackgroundTasks, topic_id: int = Form(...), file: UploadFile = File(...), session: Session = Depends(get_session),current_user: User = Depends(get_current_user)):
     topic = session.get(Topic, topic_id)
     if not topic:
         raise HTTPException(status_code=404, detail="Topic not found")
@@ -266,6 +297,9 @@ def add_material(topic_id: int = Form(...), file: UploadFile = File(...), sessio
     session.add(new_material)
     session.commit()
     session.refresh(new_material)
+
+    background_tasks.add_task(process_pdf_in_background, file_path, topic_id, new_material.id)
+
     return new_material
 
 @app.post("/quizzes/generate")
@@ -327,3 +361,107 @@ def start_quiz(quiz_id: int, session: Session = Depends(get_session), current_us
         raise HTTPException(status_code=403, detail="You do not have access to this quiz")
     quiz.questions
     return quiz
+
+@app.delete("/subjects/{subject_id}")
+def delete_subject(subject_id: int, session: Session = Depends(get_session), current_user: User = Depends(get_current_user)):
+    subject = session.get(Subject, subject_id)
+    if not subject:
+        raise HTTPException(status_code=404, detail="Subject not found")
+    if subject.user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="You do not have access to this subject")
+    for topic in subject.topics:
+        for material in topic.materials:
+            if material.file_path and os.path.exists(material.file_path):
+                try:
+                    os.remove(material.file_path)
+                except Exception as e:
+                    print(f"Failed to delete physical file {material.file_path}: {e}")
+    session.delete(subject)
+    session.commit()
+    return {"message": f"Subject '{subject.name}' successfully deleted."}
+
+@app.delete("/topics/{topic_id}")
+def delete_topic(topic_id: int, session: Session = Depends(get_session), current_user: User = Depends(get_current_user)):
+    topic = session.get(Topic, topic_id)
+    if not topic:
+        raise HTTPException(status_code=404, detail="Topic not found")
+    if topic.subject.user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="You do not have access to this topic")
+    for material in topic.materials:
+            if material.file_path and os.path.exists(material.file_path):
+                try:
+                    os.remove(material.file_path)
+                except Exception as e:
+                    print(f"Failed to delete physical file {material.file_path}: {e}")
+    session.delete(topic)
+    session.commit()
+    return {"message": f"Topic '{topic.name}' successfully deleted."}
+
+@app.delete("/quizzes/{quiz_id}")
+def delete_quiz(quiz_id: int, session: Session = Depends(get_session), current_user: User = Depends(get_current_user)):
+    quiz = session.get(Quiz, quiz_id)
+    if not quiz:
+        raise HTTPException(status_code=404, detail="Quiz not found")
+    if quiz.user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="You do not have access to this quiz")
+    session.delete(quiz)
+    session.commit()
+    return {"message": f"Quiz '{quiz.name}' successfully deleted."}
+
+@app.delete("/materials/{material_id}")
+def delete_material(
+    material_id: int, 
+    session: Session = Depends(get_session), 
+    current_user: User = Depends(get_current_user)
+):
+    material = session.get(Material, material_id)
+    if not material:
+        raise HTTPException(status_code=404, detail="Material not found")
+
+    # SECURITY: Follow the chain up to the user (Material -> Topic -> Subject -> User)
+    if material.topic.subject.user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="You do not have permission to delete this material")
+
+    # 1. DELETE THE PHYSICAL FILE FIRST
+    # If the database delete fails later, it's better to have a ghost record 
+    # than a ghost file permanently eating up server space.
+    if material.file_path and os.path.exists(material.file_path):
+        try:
+            os.remove(material.file_path)
+        except Exception as e:
+            print(f"Failed to delete physical file {material.file_path}: {e}")
+            # Depending on your strictness, you could raise an HTTP error here
+
+    # 2. DELETE FROM DATABASE
+    session.delete(material)
+    session.commit()
+
+    return {"message": f"Material '{material.name}' successfully deleted."}
+
+@app.get("/attempts", response_model=List[QuizAttemptsGroup])
+def get_user_attempts(
+    session: Session = Depends(get_session), 
+    current_user: User = Depends(get_current_user)):
+    
+    statement = (
+        select(Quiz, QuizAttempt)
+        .join(QuizAttempt, QuizAttempt.quiz_id == Quiz.id)
+        .where(QuizAttempt.user_id == current_user.id)
+    )
+    
+    results = session.exec(statement).all()
+    grouped_data = {}
+    for quiz, attempt in results:
+        if quiz.id not in grouped_data:
+            grouped_data[quiz.id] = {
+                "quiz_id": quiz.id,
+                "quiz_name": quiz.name,
+                "attempts": []
+            }
+        
+        grouped_data[quiz.id]["attempts"].append({
+            "id": attempt.id,
+            "date": attempt.date,
+            "score": attempt.score
+        })
+    return list(grouped_data.values())

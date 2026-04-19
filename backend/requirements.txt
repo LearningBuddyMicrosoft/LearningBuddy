@@ -1,0 +1,16 @@
+fastapi
+uvicorn
+sqlmodel
+PyJWT
+passlib[bcrypt]
+bcrypt==3.2.2
+python-multipart
+dotenv
+google-auth
+psycopg2-binary
+PyPDF2
+python-docx
+python-pptx
+Pillow
+requests
+pgvector

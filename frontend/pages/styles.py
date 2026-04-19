@@ -144,22 +144,15 @@ def apply_custom_css(colors):
     }}
 
     .auth-shell {{
-        max-width: 1000px;
-        height:50px;
-        margin: 12vh auto 0 auto;
+        max-width: 500px;
+        margin: 6vh auto 0 auto;
         background: {colors["card_bg_2"]};
         border-radius: 22px;
         padding: 1.4rem;
         border: 1px solid {colors["border"]};
         box-shadow: 0 14px 32px rgba(0,0,0,0.12);
     }}
-    .sign{{
-        height:400px;
-        background:#205a56;
-    }}
 
-
-    
     .auth-top {{
         text-align: center;
         margin-bottom: 0.8rem;
@@ -235,13 +228,10 @@ def apply_custom_css(colors):
     }}
 
     div.stButton > button {{
-        width:100%;
-        max-width:320px;
-        margin:0 auto;
-        display: block;
+        width: 100%;
         border-radius: 12px;
         border: 1px solid transparent;
-        background: #205a56;
+        background: {colors["shell_button"]};
         color: white;
         font-weight: 600;
         padding: 0.65rem 0.8rem;
@@ -286,14 +276,6 @@ def apply_custom_css(colors):
 
     .stProgress > div > div > div > div {{
         background: linear-gradient(90deg, {colors["accent_2"]}, {colors["accent"]});
-    }}
-
-    body, h1, h2, h3, h4, h5, h6, p, span, label, div {{
-    color: {colors["text_color"]} !important;
-}}
-    div.stButton > button {{
-    color: white !important;
-    -webkit-text-fill-color: white !important;
     }}
 
     @media (max-width: 768px) {{
