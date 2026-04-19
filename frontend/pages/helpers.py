@@ -17,7 +17,7 @@ def initialize_session_state():
     if "username" not in st.session_state:
         st.session_state.username = ""
     if "theme" not in st.session_state:
-        st.session_state.theme = "light"
+        st.session_state.theme = "Dark"
     if "q_index" not in st.session_state:
         st.session_state.q_index = 0
     if "selected_answers" not in st.session_state:

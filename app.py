@@ -6,9 +6,11 @@ from frontend.pages.styles import get_theme_colors, apply_custom_css
 from frontend.pages.progress import show_progress
 from frontend.pages.topic import show_topic_select
 from frontend.pages.hallucination import show_hallucination
+from ai.llm import llm, parser
 
 st.set_page_config(
     page_title="Learning Buddy",
+    page_icon="📘",
     layout="wide"
 )
 
@@ -59,7 +61,7 @@ if not st.session_state.authenticated:
                     st.markdown("""
                     <div class="auth-shell sign">
                         <div class="auth-top">
-                            <div class="auth-badge"> Learning Buddy</div>
+                            <div class="auth-badge">📘 Learning Buddy</div>
                             <h1 style="margin-bottom:0.25rem;">Login</h1>
                             <p class="subtle">Sign up to start using Learning Buddy.</p>
                         </div>
@@ -75,7 +77,7 @@ if not st.session_state.authenticated:
                     c1, c2 = st.columns(2)
 
                     with c1:
-                        if st.button("Back", use_container_width=True):
+                        if st.button("⬅ Back", use_container_width=True):
                             st.session_state.auth_page = "Landing"
                             st.rerun()
 
@@ -120,7 +122,8 @@ if not st.session_state.authenticated:
             c1, c2 = st.columns(2)
 
             with c1:
-                if st.button("Back", use_container_width=True):
+                if st.button("⬅ Back", use_container_width=True):
+                    st.session_state.auth_page = "Landing"
                     st.rerun()
 
             with c2:
@@ -163,7 +166,6 @@ else:
         st.session_state.prev_nav_selection = selected
 
     st.markdown("</div>", unsafe_allow_html=True)
-    # ── resolve questions from session state or fall back to static list ──
     def get_questions():
         if st.session_state.get("questions") is not None:
             return st.session_state["questions"]
@@ -219,11 +221,9 @@ else:
                 if st.button("Generate Quiz from PDF", use_container_width=True):
                     from backend.app.pdf_processor import generate_quiz_from_pdf
 
-                    #Reset previous quiz state
                     st.session_state.questions = None
                     st.session_state.q_index = 0
                     reset_quiz()
-
 
                     with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
                         tmp.write(uploaded_file.read())
@@ -238,27 +238,14 @@ else:
 
                     os.unlink(tmp_path)
 
-                    # Validate
-                    if not generated:  # you can adjust minimum questions
+                    if not generated:
                         st.error("Could not generate enough valid questions from this PDF.")
                     else:
                         st.session_state.questions = generated
-                        st.session_state.q_index = 0       # RESET INDEX
+                        st.session_state.q_index = 0
                         reset_quiz()
                         st.session_state.page = "Quiz"
                         st.rerun()
-
-                        n_generated = len(generated)
-                        if n_generated == 0:
-                            st.error("Could not generate any questions from this PDF. Try a different file or ensure it contains selectable text.")
-                        else:
-                            st.success(f"Generated {n_generated} question{'s' if n_generated > 1 else ''} from the uploaded PDF.")
-                            st.session_state.questions = generated
-                            st.session_state.q_index = 0
-                            reset_quiz()
-                            st.session_state.page = "Quiz"
-                            st.rerun()
- 
 
         st.markdown("</div>", unsafe_allow_html=True)
 
@@ -301,7 +288,6 @@ else:
 
         current_answer = st.session_state.selected_answers.get(q_index, None)
 
-        # Safe index lookup — strips both sides before comparing
         clean_options = [o.strip() for o in q["options"]]
         clean_current = current_answer.strip() if current_answer else None
         safe_index = clean_options.index(clean_current) if clean_current in clean_options else 0
