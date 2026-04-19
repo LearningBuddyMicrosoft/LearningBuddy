@@ -4,12 +4,20 @@ from api_client import login, register
 st.set_page_config(page_title="Login – Learning Buddy", page_icon="🎓", layout="centered")
 
 # ── Already logged in ─────────────────────────────────────────────────────────
+st.markdown("""
+<style>
+.block-container {
+    padding-top: 2.5rem; 
+}
+</style>
+""", unsafe_allow_html=True)#removes top padding above logo
 if st.session_state.get("token"):
     st.switch_page("pages/testpages/dashboard.py")
-
-st.title("🎓 Learning Buddy")
-st.caption("Your adaptive AI study assistant")
-st.divider()
+col1,col2,col3=st.columns([1,2,1])
+with col2:
+    st.image("logo.png", width=500)
+#st.caption("Your adaptive AI study assistant")
+# st.divider()
 
 tab_login, tab_register = st.tabs(["Log In", "Register"])
 

@@ -1,7 +1,9 @@
 import streamlit as st
 import plotly.graph_objects as go
+
 def show_progress():
-    
+    if not st.session_state.get("token"):
+        st.switch_page("pages/testpages/login.py")
     history=st.session_state.get("quiz_history",[])
     if not history:
         st.info("No quiz attempts yet.")
@@ -140,3 +142,4 @@ def show_progress():
                     st.markdown("🎉 All correct! No suggested topics.")
         else:
             st.info("No quiz attempts yet.")
+show_progress()

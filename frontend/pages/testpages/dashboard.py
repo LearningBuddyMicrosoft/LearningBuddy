@@ -13,7 +13,7 @@ with st.sidebar:
         st.session_state.attempt_id = None
         st.switch_page("pages/testpages/login.py")
 
-st.title("Dashboard")
+st.markdown("## Dashboard")
 
 data = get_dashboard()
 if not data:
