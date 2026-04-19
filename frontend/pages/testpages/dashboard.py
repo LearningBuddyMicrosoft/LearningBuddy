@@ -34,8 +34,8 @@ subjects = data.get("subjects", [])
 
 if not subjects:
     st.info("You have no subjects yet. Head to **Manage** to create your first subject and upload materials.")
-    if st.button("Go to Manage"):
-        st.switch_page("pages/testpages/manage.py")
+    if st.button("Go to Subjects/Topics"):
+        st.switch_page("pages/testpages/subject.py")
     st.stop()
 
 total_topics = sum(len(s.get("topics", [])) for s in subjects)
@@ -45,7 +45,7 @@ col1.metric("Subjects", len(subjects))
 col2.metric("Topics", total_topics)
 
 st.markdown("<hr style='margin:0.2rem 0; border:1px solid #eee'>", unsafe_allow_html=True)
-st.subheader("Your Subjects & Topics")
+st.markdown("#### Your Subjects & Topics")
 
 
 cols = st.columns(3)
@@ -70,7 +70,7 @@ st.markdown("<hr style='margin-top:0.2rem 0; border:1px solid #eee'>", unsafe_al
 col_a, col_b = st.columns(2)
 with col_a:
     if st.button("Add Subject / Topic", use_container_width=True):
-        st.switch_page("pages/testpages/manage.py")
+        st.switch_page("pages/testpages/subject.py")
 with col_b:
     if st.button("Generate a Quiz", use_container_width=True):
         st.switch_page("pages/testpages/generate_quiz.py")
