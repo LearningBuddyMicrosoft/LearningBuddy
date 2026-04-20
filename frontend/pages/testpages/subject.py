@@ -1,6 +1,7 @@
 import os
 import tempfile
 import streamlit as st
+import requests
 from pages.testpages.styles1 import apply_custom_css
 apply_custom_css()
 DATABASE_URL = os.getenv("DATABASE_URL")
@@ -26,6 +27,7 @@ with st.sidebar:
     if st.button("Log Out", use_container_width=True):
         st.session_state.token = None
         st.switch_page("pages/testpages/login.py")
+
 st.markdown("""
 <style>
 .block-container {
@@ -50,6 +52,8 @@ def refresh():
 
 dashboard = load_dashboard()
 subjects = dashboard.get("subjects", []) if dashboard else []
+topic = dashboard.get("topic", []) if dashboard else []
+
 
 # tab_subjects, tab_topics, tab_upload, tab_details = st.tabs([
 #     "Subjects", "Topics", "Upload Material", "Topic Details"
@@ -96,8 +100,37 @@ if st.session_state.active_section == "Subject":
             topics = subject.get("topics", [])
 
             with cols[i % 3]:
-                st.markdown(f"- **{subject['name']}**")
-
+                with st.container(border=True):
+                    c_title, c_btn = st.columns([4, 1])
+                    with c_title:
+                        st.markdown(f"**{subject['name']}**")
+                    with c_btn:
+                        if st.button("🗑️", key=f"delete_{subject['id']}"):
+                            st.session_state[f"confirm_{subject['id']}"] = True
+                    if st.session_state.get(f"confirm_{subject['id']}"):
+                        st.warning(f"Delete '{subject['name']}'?")
+                        c1, c2 = st.columns(2)
+                        with c1:
+                            if st.button("Yes", key=f"yes_{subject['id']}", use_container_width=True):
+                                token = st.session_state.get("token")
+                                headers = {"Authorization": f"Bearer {token}"}
+                                try:
+                                    response = requests.delete(
+                                        f"{API_BASE_URL}/subjects/{subject['id']}",
+                                        headers=headers
+                                    )
+                                    if response.status_code == 200:
+                                        st.success(f"Deleted '{subject['name']}'")
+                                        st.session_state[f"confirm_{subject['id']}"] = False
+                                        refresh()
+                                    else:
+                                        st.error(f"Failed — status {response.status_code}")
+                                except Exception as e:
+                                    st.error(f"Error: {e}")
+                        with c2:
+                            if st.button("Cancel", key=f"cancel_{subject['id']}", use_container_width=True):
+                                st.session_state[f"confirm_{subject['id']}"] = False
+                                st.rerun()
 
 
 if st.session_state.active_section == "Topic":
@@ -113,7 +146,7 @@ if st.session_state.active_section == "Topic":
             submitted = st.form_submit_button("Create Topic", use_container_width=True)
         col1,col2,col3=st.columns([1,2,1])
         with col2:
-            if st.button("Upload Files", use_container_width=True,key="upload_button"):
+            if st.button("Upload Files", use_container_width=True):
                 st.switch_page("pages/testpages/upload.py")
 
         if submitted:
@@ -137,7 +170,37 @@ if st.session_state.active_section == "Topic":
                     st.caption("No topics yet.")
                 else:
                     for t in s["topics"]:
-                        st.markdown(f"- **{t['name']}** ")
+                        with st.container(border=True):
+                            c_title, c_btn = st.columns([4, 1])
+                        with c_title:
+                            st.markdown(f"**{t['name']}**")
+                        with c_btn:
+                            if st.button("🗑️", key=f"delete_{t['id']}"):
+                                st.session_state[f"confirm_{t['id']}"] = True
+                        if st.session_state.get(f"confirm_{t['id']}"):
+                            st.warning(f"Delete '{t['name']}'?")
+                            c1, c2 = st.columns(2)
+                            with c1:
+                                if st.button("Yes", key=f"yes_{t['id']}", use_container_width=True):
+                                    token = st.session_state.get("token")
+                                    headers = {"Authorization": f"Bearer {token}"}
+                                    try:
+                                        response = requests.delete(
+                                            f"{API_BASE_URL}/topics/{t['id']}",
+                                            headers=headers
+                                        )
+                                        if response.status_code == 200:
+                                            st.success(f"Deleted '{t['name']}'")
+                                            st.session_state[f"confirm_{t['id']}"] = False
+                                            refresh()
+                                        else:
+                                            st.error(f"Failed — status {response.status_code}")
+                                    except Exception as e:
+                                        st.error(f"Error: {e}")
+                            with c2:
+                                if st.button("Cancel", key=f"cancel_{t['id']}", use_container_width=True):
+                                    st.session_state[f"confirm_{t['id']}"] = False
+                                    st.rerun()
 
 # ════════════════════════════════════════════════════════════════════════════
 # TAB 3 — Upload Material

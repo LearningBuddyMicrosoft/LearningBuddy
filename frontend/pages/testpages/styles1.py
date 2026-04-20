@@ -13,7 +13,6 @@ def apply_custom_css():
         transition: all 0.2s ease;
     }
 
-    /* Hover and active states for default buttons */
     div.stButton > button:hover,
     div[data-testid="stForm"] button:hover {
         background-color: #2f7a73;
@@ -22,6 +21,7 @@ def apply_custom_css():
     div.stButton > button:active,
     div[data-testid="stForm"] button:active {
         transform: scale(0.98);
+    }
     }
     </style>
     """, unsafe_allow_html=True)
