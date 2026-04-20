@@ -1,19 +1,29 @@
 import streamlit as st
 from api_client import get_dashboard, generate_quiz, start_quiz, start_attempt
-
+from pages.testpages.styles1 import apply_custom_css
+apply_custom_css()
 if not st.session_state.get("token"):
     st.switch_page("pages/testpages/login.py")
 
 st.set_page_config(page_title="Generate Quiz – Learning Buddy", page_icon="🎓", layout="centered")
-
+st.markdown("""
+<style>
+.block-container {
+    padding-top: 2.5rem; 
+}
+</style>
+""", unsafe_allow_html=True)#removes top padding above logo
 with st.sidebar:
     if st.button("Log Out", use_container_width=True):
         st.session_state.token = None
         st.switch_page("pages/testpages/login.py")
 
-st.title("Generate a Quiz")
+st.markdown("Generate a quiz") 
+col1,col2,col3=st.columns([1,1,1])
+with col2:
+    st.image("logo.png",width=400)
 st.caption("Select topics, configure your quiz, and let AI build it for you.")
-st.divider()
+st.markdown("<hr style='margin:0.2rem 0; border:1px solid #eee'>", unsafe_allow_html=True)
 
 @st.cache_data(show_spinner=False, ttl=30)
 def load_dashboard():
