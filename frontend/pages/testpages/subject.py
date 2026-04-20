@@ -135,6 +135,7 @@ if st.session_state.active_section == "Subject":
 
 if st.session_state.active_section == "Topic":
     st.markdown("**Create a New Topic**")
+    st.caption("Make you topic as specific as possible")
     if not subjects:
         st.warning("Create a subject first before adding topics.")
     else:
@@ -144,10 +145,6 @@ if st.session_state.active_section == "Topic":
             topic_name = st.text_input("Topic name", placeholder="e.g. Neural Networks")
             selected_subject = st.selectbox("Choose subject", list(subject_options.keys()))
             submitted = st.form_submit_button("Create Topic", use_container_width=True)
-        col1,col2,col3=st.columns([1,2,1])
-        with col2:
-            if st.button("Upload Files", use_container_width=True):
-                st.switch_page("pages/testpages/upload.py")
 
         if submitted:
             if not topic_name.strip():
@@ -156,6 +153,7 @@ if st.session_state.active_section == "Topic":
                 ok, err = create_topic(topic_name.strip(), subject_options[selected_subject])
                 if ok:
                     st.success(f"Topic '{topic_name}' created under '{selected_subject}'!")
+                    st.switch_page("pages/testpages/upload.py")
                     refresh()
                 else:
                     st.error(err)
