@@ -8,11 +8,7 @@ API_BASE_URL = os.getenv("BACKEND_URL", "http://localhost:8000")
 
 from api_client import (
     get_dashboard,
-    create_subject,
-    create_topic,
     upload_material,
-    get_topic_details,
-    get_questions_by_topic,
 )
 st.set_page_config(page_title="Upload – Learning Buddy", page_icon="🎓", layout="wide")
 if not st.session_state.get("token"):

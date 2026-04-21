@@ -86,7 +86,16 @@ class AttemptDetail(BaseModel):
     date: str
     score: int
 
+# In your schemas.py
 class QuizAttemptsGroup(BaseModel):
     quiz_id: int
     quiz_name: str
+    total_questions: int
     attempts: List[AttemptDetail]
+
+class TopicMastery(BaseModel):
+    topic_id: int
+    topic_name: str
+    total_attempted: int
+    total_correct: int
+    mastery_percentage: float
