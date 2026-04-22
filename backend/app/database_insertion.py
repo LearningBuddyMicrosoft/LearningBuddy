@@ -13,15 +13,16 @@ def questions_to_models(questions_json: list[dict], topic_id: int) -> list[Quest
         try:
             model = Question(
                 topic_id=topic_id,
-                question_type=q["question_type"],
-                difficulty=int(q["difficulty"]),
-                question_text=q["question_text"],
+                question_type=q.get("question_type", "MCQ"),
+                difficulty=int(q.get("difficulty", 5)),
+                question_text=q.get("question_text", ""),
                 options=q.get("options", []),
-                correct_answer=q["correct_answer"]
+                correct_answer=q.get("correct_answer", "")
             )
             models.append(model)
         except Exception as e:
-            print(f"Skipping invalid question: {e}")
+            print(f"❌ BAD QUESTION FORMAT: {q}")
+            print(f"ERROR: {e}")
 
     return models
 
