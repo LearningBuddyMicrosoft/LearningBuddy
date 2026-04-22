@@ -52,8 +52,8 @@ with st.form("generate_quiz_form"):
 
     col1, col2 = st.columns(2)
     with col1:
-        difficulty = st.slider("Difficulty level", min_value=1, max_value=5, value=3,
-                               help="1 = Easy   5 = Hard")
+        difficulty = st.slider("Difficulty level", min_value=1, max_value=3, value=3,
+                               help="1 = Easy   3 = Hard")
     with col2:
         length = st.number_input("Number of questions", min_value=1, max_value=50, value=10, step=1)
 
