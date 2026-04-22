@@ -29,19 +29,21 @@ st.success("Your attempt has been submitted and recorded!")
 result_data = st.session_state.get("last_quiz_result")
 
 if result_data:
+    feedback = result_data.get("feedback") or "No feedback provided."
+    score = result_data.get("score", 0)
+
     # 2. Display the top-level metrics
-    col1, col2 = st.columns(2)
+    col1, col2, col3 = st.columns(3)
     col1.metric("Quiz", quiz_name)
-    
-    # Assuming your backend returned the score in the JSON package!
-    score = result_data.get("score", 0) 
     col2.metric("Final Score", score)
+    col3.metric("Answered", answers_count)
 
     st.divider()
     
-    # 3. Display the detailed AI feedback!
-    st.subheader("Detailed Feedback")
-    st.write(result_data.get("feedback", "No feedback provided."))
+    # 3. Display the detailed AI feedback
+    st.subheader("AI Feedback")
+    with st.container(border=True):
+        st.markdown(feedback)
     
 else:
     st.warning("Could not load detailed results. Please try taking the quiz again.")
