@@ -1,8 +1,10 @@
 import os
+import json
 from typing import List
 
 from fastapi import FastAPI, Depends, File, Form, HTTPException, UploadFile, BackgroundTasks
 from fastapi.concurrency import asynccontextmanager
+import requests
 from sqlmodel import Session, select, func
 
 from .database_insertion import store_document_embeddings
@@ -29,6 +31,9 @@ async def lifespan(app: FastAPI):
     print("👋 App shutting down: Cleaning up resources...")     
 
 app = FastAPI(lifespan=lifespan)
+
+OLLAMA_URL = os.getenv("OLLAMA_URL")
+FEEDBACK_MODEL = os.getenv("OLLAMA_FEEDBACK_MODEL", "llama3.1")
 
 @app.post("/register/")
 def register_user(user_create: UserCreate, session: Session = Depends(get_session)):
@@ -106,11 +111,30 @@ def finish_attempt(submission: FinishAttempt, session: Session = Depends(get_ses
         Response.is_correct == True
     )
     correct_count = session.exec(statement).one() or 0
+    total_count = session.exec(
+        select(func.count()).where(Response.attempt_id == submission.attempt_id)
+    ).one() or 0
+
+    wrong_question_rows = session.exec(
+        select(Question.question_text, Response.selected_option, Question.correct_answer).join(
+            Response, Response.question_id == Question.id
+        ).where(
+            Response.attempt_id == submission.attempt_id,
+            Response.is_correct == False
+        )
+    ).all()
+    wrong_questions = [
+        {
+            "question": question_text,
+            "selected_answer": selected_option,
+            "correct_answer": correct_answer,
+        }
+        for question_text, selected_option, correct_answer in wrong_question_rows
+    ]
 
     # Update the attempt with the final score and feedback
     attempt.score = int(correct_count)
-    #TODO:hardcoded overall feedback for now, will be calling AI for this in the future
-    attempt.feedback = f"You got {attempt.score} correct answers."
+    attempt.feedback = generate_feedback(wrong_questions, attempt.score, int(total_count))
 
     quiz = session.get(Quiz, attempt.quiz_id)
     if quiz:
@@ -131,7 +155,7 @@ def submit_batch_answers(batch_submission: BatchSubmission, session: Session = D
     if new_attempt.user_id != current_user.id:
         raise HTTPException(status_code=403, detail="You do not have access to this attempt")
     score = 0
-    graded_responses = []
+    wrong_questions = []
     response_list = []
     for answer in batch_submission.answers:
         question = session.get(Question, answer.question_id)
@@ -142,12 +166,17 @@ def submit_batch_answers(batch_submission: BatchSubmission, session: Session = D
 
         if is_correct:
             score += 1
-            graded_responses.append(question.question_text + ": Correct")
         else:
-            graded_responses.append(question.question_text + ": Incorrect")
+            wrong_questions.append(
+                {
+                    "question": question.question_text,
+                    "selected_answer": answer.selected_option,
+                    "correct_answer": question.correct_answer,
+                }
+            )
         
-    #TODO:hardcoded feedback for now, will be calling AI for this in the future
-    overall_feedback = f"{score} out of {len(batch_submission.answers)} correct. {'; '.join(graded_responses)}"
+    total_answers = len(batch_submission.answers)
+    overall_feedback = generate_feedback(wrong_questions, score, total_answers)
 
     new_attempt.score = score
     new_attempt.feedback = overall_feedback
@@ -186,6 +215,66 @@ def grade_and_build_response(submission: AnswerSubmission, current_user_id: int,
         feedback=feedback   
         )
     return response
+
+def build_fallback_feedback(score: int, total: int) -> str:
+    if total == 0:
+        return "No answers were submitted."
+
+    percentage = score / total
+    if percentage == 1:
+        return f"Perfect score: {score} out of {total} correct."
+    if percentage >= 0.7:
+        return f"Nice work: {score} out of {total} correct."
+    if percentage >= 0.4:
+        return f"Good effort: {score} out of {total} correct. Keep practicing."
+    return f"{score} out of {total} correct. Review the material and try again."
+
+def generate_feedback(wrong_questions, score: int, total: int) -> str:
+    if total == 0:
+        return "No questions were answered."
+
+    if not wrong_questions:
+        return f"Excellent work - you scored {score}/{total} with no mistakes."
+
+    if not OLLAMA_URL:
+        return build_fallback_feedback(score, total)
+
+    prompt = f"""
+You are an expert tutor.
+
+A student scored {score}/{total}.
+
+They got the following questions wrong:
+
+{json.dumps(wrong_questions, indent=2)}
+
+Provide:
+1. A short performance summary
+2. Key weak concepts
+3. Specific advice for improvement
+
+Keep it concise, structured, and encouraging.
+"""
+
+    try:
+        response = requests.post(
+            f"{OLLAMA_URL}/api/generate",
+            json={
+                "model": FEEDBACK_MODEL,
+                "prompt": prompt,
+                "stream": False,
+                "options": {
+                    "temperature": 0.3,
+                    "num_predict": 300
+                }
+            },
+            timeout=60,
+        )
+        response.raise_for_status()
+        content = response.json().get("response", "")
+        return content.strip() if content else build_fallback_feedback(score, total)
+    except Exception:
+        return build_fallback_feedback(score, total)
 
 @app.get("/dashboard", response_model=DashboardRead)
 def get_user_dashboard(current_user: User = Depends(get_current_user), session: Session = Depends(get_session)):
@@ -245,7 +334,7 @@ def process_pdf_in_background(file_path: str, topic_id: int, material_id: int):
                 session=background_session, 
                 topic_id=topic_id, 
                 material_id=material_id, # Pass the material_id instead of pdf_path!
-                num_questions=10 
+                num_questions=50 
             )
             
         except Exception as e:
@@ -292,11 +381,11 @@ def generate_quiz(payload:QuizCreate, session: Session = Depends(get_session),cu
             raise HTTPException(status_code=403, detail=f"You do not have access to topic with ID {topic_id}")
         verified_topics.append(topic)
     if payload.difficulty_level == 1:
-        min_diff, max_diff = 1, 3
+        min_diff, max_diff = 1, 2
     elif payload.difficulty_level == 2:
-        min_diff, max_diff = 4, 7
+        min_diff, max_diff = 3, 4
     elif payload.difficulty_level == 3:
-        min_diff, max_diff = 8, 10
+        min_diff, max_diff = 5, 5
     else:
         raise HTTPException(status_code=400, detail="Invalid difficulty level")
     
@@ -547,3 +636,4 @@ def get_topic_mastery_history(
         t["history"][-1]["percentage"] = round((t["running_correct"] / t["running_total"]) * 100, 1)
 
     return list(topics_dict.values())
+    return list(grouped_data.values())

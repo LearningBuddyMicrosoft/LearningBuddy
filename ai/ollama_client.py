@@ -1,7 +1,7 @@
 import requests
 
 OLLAMA_URL = "http://localhost:11434/api/generate"
-MODEL_NAME = "phi3.5"
+MODEL_NAME = "llama3.1"
 
 def generate(prompt: str, max_tokens: int = 500) -> str:
     response = requests.post(OLLAMA_URL, json={
@@ -9,7 +9,7 @@ def generate(prompt: str, max_tokens: int = 500) -> str:
         "prompt": prompt,
         "stream": False,
         "options": {
-            "temperature": 0.5,
+            "temperature": 0.3,
             "num_predict": max_tokens
         }
     })
