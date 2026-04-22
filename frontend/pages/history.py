@@ -1,5 +1,5 @@
 import streamlit as st
-from frontend.pages.styles import get_theme_colors
+from pages.styles import get_theme_colors
 
 def show_history(colors):
     colors = get_theme_colors(st.session_state.theme)
