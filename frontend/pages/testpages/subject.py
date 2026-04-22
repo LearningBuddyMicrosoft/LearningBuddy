@@ -11,9 +11,6 @@ from api_client import (
     get_dashboard,
     create_subject,
     create_topic,
-    upload_material,
-    get_topic_details,
-    get_questions_by_topic,
 )
 
 if not st.session_state.get("token"):

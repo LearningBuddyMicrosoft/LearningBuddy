@@ -157,18 +157,6 @@ def finish_attempt(attempt_id: int):
         st.error(res.json().get("detail", "Failed to finish attempt"))
     return None
 
-def get_questions_by_topic(topic_id: int):
-    res = api("GET", f"/topics/{topic_id}/questions")
-
-    print("FETCHING:", f"{API_BASE_URL}/topics/{topic_id}/questions")
-    if res and res.status_code == 200:
-        return res.json()
-
-    if res:
-        st.error(res.json().get("detail", "Failed to load questions"))
-
-    return None
-
 def delete_subject(subject_id: int):
     res = api("DELETE", f"/subjects/{subject_id}")
     if res and res.status_code == 200:
@@ -200,3 +188,27 @@ def delete_material(material_id: int):
     elif res:
         st.error(res.json().get("detail", "Failed to delete material"))
     return False
+
+def get_user_attempts():
+    res = api("GET", f"/attempts")
+    if res and res.status_code == 200:
+        return res.json()
+    elif res:
+        st.error(res.json().get("detail", "Failed to load quiz attempts"))
+    return None
+
+def get_mastery_history():
+    res = api("GET", "/users/me/mastery-history")
+    if res and res.status_code == 200:
+        return res.json()
+    elif res:
+        st.error(res.json().get("detail", "Failed to load user mastery"))
+    return []
+
+def get_user_mastery():
+    res = api("GET", "/users/me/mastery")
+    if res and res.status_code == 200:
+        return res.json()
+    elif res:
+        st.error(res.json().get("detail", "Failed to load user mastery"))
+    return None

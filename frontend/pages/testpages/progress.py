@@ -1,145 +1,129 @@
 import streamlit as st
 import plotly.graph_objects as go
+from api_client import get_user_mastery, get_mastery_history 
 
 def show_progress():
+    # Authentication Check
     if not st.session_state.get("token"):
         st.switch_page("pages/testpages/login.py")
-    history=st.session_state.get("quiz_history",[])
-    if not history:
-        st.info("No quiz attempts yet.")
-        st.stop()
-        history=st.session_state.quiz_history
+        
+    st.title("Learning Progress & Mastery")
+    st.divider()
 
-    attempt_numbers=list(range(1,len(history)+1))
-    percentages=[attempt["percentage"] for attempt in history]
-    percentages.reverse()
-    fig = go.Figure()
-    theme = st.session_state.get("theme", "Dark") 
-    if theme=="Light":
-        line=dict(color='navy', width=5)
-        marker=dict(size=10, color='black')
-    else:
-        line=dict(color='#ADD8E6', width=5)
-        marker=dict(size=10, color='white')
-   
-    fig.add_trace(go.Scatter(
-        x=attempt_numbers,
-        y=percentages,
-        mode='lines+markers',
-        line=line,
-        marker=marker,
-        hovertemplate='Attempt %{x}: %{y}%<extra></extra>'
-    ))
+    # 1. FETCH LIVE DATA FROM DB
+    with st.spinner("Loading your progress..."):
+        mastery_data = get_user_mastery()
+        history_data = get_mastery_history() 
 
+    # 2. FOCAL POINT: TOPIC MASTERY
+    st.header("🎯 Current Topic Mastery")
     
-
-    if theme=="Light":
-        title = dict(
-            text="Quiz Progress",
-            font=dict(color="black", size=24)
-        )
-        xaxis=dict(
-            title=dict(
-                text="Attempts",
-                font=dict(color="navy", size=18)
-            ),
-            tickfont=dict(color="grey", size=14),
-            dtick=1
-        )
-        yaxis=dict(
-            title=dict(
-                font=dict(color="navy", size=18)
-            ),
-            tickfont=dict(color="grey", size=14),
-            range=[0, 100],
-            dtick=10
-    )
+    if not mastery_data:
+        st.info("No topic data available yet. Complete some quizzes to see your mastery!")
     else:
-        title = dict(
-            text="Quiz Progress",
-            font=dict(color="#e5ecf6", size=24)
-        )
-        xaxis = dict(
-            title=dict(
-                text="Attempts",
-                font=dict(color="#e5ecf6", size=18)
+        # Display mastery in neat columns (3 per row)
+        cols = st.columns(3)
+        for idx, topic in enumerate(mastery_data):
+            col = cols[idx % 3]
+            with col:
+                pct = topic.get("mastery_percentage", 0.0)
+                st.metric(
+                    label=topic.get("topic_name", "Unknown Topic"), 
+                    value=f"{pct}%"
+                )
+                
+                # st.progress requires a float strictly between 0.0 and 1.0
+                progress_float = min(max(pct / 100.0, 0.0), 1.0)
+                st.progress(progress_float, text=f"{topic.get('total_correct', 0)}/{topic.get('total_attempted', 0)} correct")
+                st.write("") # Spacer
+
+    st.divider()
+
+    # 3. OVER TIME: TOPIC PROGRESSION CHARTS
+    st.header("📈 Topic Progress Over Time")
+    
+    if not history_data:
+        st.info("No historical data yet. Keep taking quizzes!")
+        st.stop()
+
+    theme = st.session_state.get("theme", "Dark") 
+
+    for topic in history_data:
+        # Only show a chart if they have answered questions across at least 2 different attempts
+        if len(topic.get("history", [])) < 2:
+            continue 
+            
+        st.subheader(f"{topic['topic_name']} Mastery")
+        
+        # Extract the data for Plotly
+        attempt_numbers = list(range(1, len(topic["history"]) + 1))
+        percentages = [point["percentage"] for point in topic["history"]]
+        
+        # --- PLOTLY CHART CONFIG ---
+        fig = go.Figure()
+        
+        if theme == "Light":
+            line = dict(color='navy', width=5)
+            marker = dict(size=10, color='black')
+            axis_font = "navy"
+            tick_font = "grey"
+        else:
+            line = dict(color='#ADD8E6', width=5)
+            marker = dict(size=10, color='white')
+            axis_font = "#e5ecf6"
+            tick_font = "#94a3b8"
+       
+        fig.add_trace(go.Scatter(
+            x=attempt_numbers,
+            y=percentages,
+            mode='lines+markers',
+            line=line,
+            marker=marker,
+            hovertemplate='Attempt %{x}: %{y}% Mastery<extra></extra>'
+        ))
+
+        fig.update_layout(
+            xaxis=dict(
+                title=dict(text="Attempts Involving This Topic", font=dict(color=axis_font, size=14)),
+                tickfont=dict(color=tick_font),
+                dtick=1
             ),
-            tickfont=dict(color="#94a3b8", size=14),
-            dtick=1
-        )
-        yaxis = dict(
-            title=dict(
-                font=dict(color="#e5ecf6", size=18)
+            yaxis=dict(
+                title=dict(text="Cumulative Mastery %", font=dict(color=axis_font, size=14)),
+                tickfont=dict(color=tick_font),
+                range=[0, 105], # Slightly above 100 so the top marker isn't cut off
+                dtick=10
             ),
-            tickfont=dict(color="#94a3b8", size=14),
-            range=[0, 100],
-            dtick=10
+            height=350,
+            template="simple_white",
+            paper_bgcolor='rgba(0,0,0,0)',
+            plot_bgcolor='rgba(0,0,0,0)',
+            margin=dict(l=20, r=20, t=20, b=20)
         )
-    fig.update_layout(
-        title=title,
-        xaxis=xaxis,
-        yaxis=yaxis,
-        width=600,
-        height=400,
-        template="simple_white",
-        paper_bgcolor='rgba(0,0,0,0)',
-        plot_bgcolor='rgba(0,0,0,0)'
-)
-    current_index=-1
-    fig.add_annotation(
-    x=attempt_numbers[current_index],
-    y=percentages[current_index]+10,
-    text="Current",
-    showarrow=False,
-    ax=0,
-    ay=-30,
-    font=dict(color="blue", size=14)
-)
-    col1, col2 = st.columns(2)  
-    with col1:
-        st.plotly_chart(fig, use_container_width=True)
-    with col2:   
-        if len(percentages) > 1:
+        
+        # --- RENDER UI ---
+        col1, col2 = st.columns([2, 1])  
+        with col1:
+            st.plotly_chart(fig, use_container_width=True)
+            
+        with col2:   
+            st.write("") # Padding to push metrics down
+            st.write("") 
+            
             last = percentages[-1]
             previous = percentages[-2]
-            max_score = max(percentages[:-1])
+            max_score = max(percentages)
      
             if last > previous:
-                st.success("📈 Better than last attempt!")
+                st.success("📈 Mastery Increasing!")
             elif last < previous:
-                st.error("📉 Worse than last attempt.")
+                st.error("📉 Mastery Dropped.")
             else:
-                st.info("➖ Same as last attempt.")
-        else:
-            last = percentages[-1]
-            max_score = last
-            st.info("Only one attempt recorded.")
+                st.info("➖ Mastery Maintained.")
 
-        if last > max_score:
-            st.markdown(
-                f'<div style="color:green; font-size:50px; font-weight:bold;">NEW HIGH SCORE! {last}%</div>',
-                unsafe_allow_html=True
-            )
-        else:
-            st.markdown(
-                f'<div style="color:blue; font-size:30px;">Current Score: {last}%</div>',
-                unsafe_allow_html=True
-            )
-            st.markdown(
-                f'<div style="color:orange; font-size:20px;">High Score: {max_score}%</div>',
-                unsafe_allow_html=True
-            )
-        history = st.session_state.get("quiz_history", [])
-        if history:
-            last_attempt = history[0]  # newest attempt is at index 0
-            wrong_questions = last_attempt.get("wrong_questions", [])
-            with st.expander("**Suggested Next Topics**", expanded=False):
+            st.markdown(f'<div style="font-size:24px;">Current Mastery: **{last}%**</div>', unsafe_allow_html=True)
+            st.markdown(f'<div style="color:gray; font-size:16px;">Peak Mastery: {max_score}%</div>', unsafe_allow_html=True)
+            
+        st.divider()
 
-                if wrong_questions:
-                    for q in wrong_questions:
-                        st.markdown(f"- {q}")
-                else:
-                    st.markdown("🎉 All correct! No suggested topics.")
-        else:
-            st.info("No quiz attempts yet.")
 show_progress()
