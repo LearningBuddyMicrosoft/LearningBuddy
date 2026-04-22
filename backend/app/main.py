@@ -386,19 +386,10 @@ def generate_quiz(payload:QuizCreate, session: Session = Depends(get_session),cu
         if topic.subject.user_id != current_user.id:
             raise HTTPException(status_code=403, detail=f"You do not have access to topic with ID {topic_id}")
         verified_topics.append(topic)
-    if payload.difficulty_level == 1:
-        min_diff, max_diff = 1, 2
-    elif payload.difficulty_level == 2:
-        min_diff, max_diff = 3, 4
-    elif payload.difficulty_level == 3:
-        min_diff, max_diff = 5, 5
-    else:
-        raise HTTPException(status_code=400, detail="Invalid difficulty level")
     
     statement = select(Question).where(
         Question.topic_id.in_(payload.topic_ids),
-        Question.difficulty >= min_diff,
-        Question.difficulty <= max_diff
+        Question.difficulty == payload.difficulty_level
     ).order_by(func.random()).limit(payload.length)
     
     selected_questions = session.exec(statement).all()
