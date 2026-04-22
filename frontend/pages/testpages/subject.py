@@ -134,8 +134,8 @@ if st.session_state.active_section == "Subject":
 
 
 if st.session_state.active_section == "Topic":
-    st.markdown("**Create a New Topic**")
-    st.caption("Make you topic as specific as possible")
+    st.markdown("**Create a New Topic**",help="Make your topic as specific as possible")
+    
     if not subjects:
         st.warning("Create a subject first before adding topics.")
     else:

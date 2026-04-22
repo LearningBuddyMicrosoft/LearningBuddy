@@ -33,7 +33,7 @@ st.markdown("<hr style='margin:0.2rem 0; border:1px solid #eee'>", unsafe_allow_
 subjects = data.get("subjects", [])
 
 if not subjects:
-    st.info("You have no subjects yet. Head to **Manage** to create your first subject and upload materials.")
+    st.info("You have no subjects yet. Head to **Switch Topic** to create your first subject and upload materials.")
     if st.button("Go to Subjects/Topics"):
         st.switch_page("pages/testpages/subject.py")
     st.stop()
@@ -47,7 +47,6 @@ col2.metric("Topics", total_topics)
 st.markdown("<hr style='margin:0.2rem 0; border:1px solid #eee'>", unsafe_allow_html=True)
 st.markdown("#### Your Subjects & Topics")
 
-
 cols = st.columns(3)
 
 for i, subject in enumerate(subjects):
@@ -55,7 +54,7 @@ for i, subject in enumerate(subjects):
 
     with cols[i % 3]:
         with st.expander(
-            f"{subject['name']} ({len(topics)} topic{'s' if len(topics) != 1 else ''})",
+            f"{subject['name']} ({len(topics)} Topic{'s' if len(topics) != 1 else ''})",
             expanded=False
         ):
             if not topics:
@@ -65,7 +64,7 @@ for i, subject in enumerate(subjects):
                 )
             else:
                 for topic in topics:
-                    st.markdown(f"- {topic['name']}")
+                    st.page_link("pages/testpages/subject.py",label=f"{topic['name']}")
 st.markdown("<hr style='margin-top:0.2rem 0; border:1px solid #eee'>", unsafe_allow_html=True)
 col_a, col_b = st.columns(2)
 with col_a:

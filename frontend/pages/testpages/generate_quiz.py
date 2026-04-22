@@ -35,8 +35,8 @@ all_topics = [t for s in subjects for t in s.get("topics", [])]
 
 if not all_topics:
     st.warning("You need at least one topic before generating a quiz.")
-    if st.button("Go to Manage"):
-        st.switch_page("pages/testpages/manage.py")
+    if st.button("Go to Subject/Topics"):
+        st.switch_page("pages/testpages/subject.py")
     st.stop()
 
 topic_options = {t["name"]: t["id"] for t in all_topics}
