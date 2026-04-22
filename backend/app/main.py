@@ -15,7 +15,13 @@ from .security import create_access_token, get_current_user, get_password_hash, 
 from .database import create_db_and_tables, get_session, engine
 from datetime import date
 from .models import Material, Question, Quiz, Response, Subject, Topic, User, QuizAttempt # From your previous steps
-from.schemas import DashboardRead, QuizAttemptsGroup, QuizCreate, QuizRead, SubjectCreate, TopicCreate, TopicDetailedRead, TopicMastery, UserCreate, StartAttempt, AnswerSubmission, FinishAttempt, BatchSubmission
+from .schemas import (
+    DashboardRead, QuizAttemptsGroup, QuizCreate, QuizRead,
+    SubjectCreate, TopicCreate, TopicDetailedRead,
+    TopicMastery,  # ← kept from second file
+    UserCreate, StartAttempt, AnswerSubmission,
+    FinishAttempt, BatchSubmission
+)
 
 app = FastAPI()
 
@@ -511,12 +517,11 @@ def get_user_attempts(
     session: Session = Depends(get_session), 
     current_user: User = Depends(get_current_user)
 ):
-    # 1. Join and sort chronologically 
     statement = (
         select(Quiz, QuizAttempt)
         .join(QuizAttempt, QuizAttempt.quiz_id == Quiz.id)
         .where(QuizAttempt.user_id == current_user.id)
-        .order_by(Quiz.id, QuizAttempt.date.asc())
+        .order_by(Quiz.id, QuizAttempt.date.asc())  # ✅ keep sorting
     )
     
     results = session.exec(statement).all()
@@ -527,7 +532,7 @@ def get_user_attempts(
             grouped_data[quiz.id] = {
                 "quiz_id": quiz.id,
                 "quiz_name": quiz.name,
-                "total_questions": quiz.length, # ⬅️ Just grab your column directly!
+                "total_questions": quiz.length,  # ✅ important for frontend
                 "attempts": []
             }
         
@@ -539,24 +544,21 @@ def get_user_attempts(
         
     return list(grouped_data.values())
 
+
 @app.get("/users/me/mastery", response_model=List[TopicMastery])
 def get_user_mastery(
     session: Session = Depends(get_session), 
     current_user: User = Depends(get_current_user)
 ):
-    # 1. Grab every single answer this user has ever submitted, 
-    # joined with the Question and the Topic.
     statement = (
         select(Topic, Question, Response)
         .join(Question, Question.topic_id == Topic.id)
         .join(Response, Response.question_id == Question.id)
-        .join(QuizAttempt, Response.attempt_id == QuizAttempt.id) # <-- Bridge to the attempt!
-        .where(QuizAttempt.user_id == current_user.id) # <-- Filter by the logged-in user
+        .join(QuizAttempt, Response.attempt_id == QuizAttempt.id)
+        .where(QuizAttempt.user_id == current_user.id)
     )
     
     results = session.exec(statement).all()
-
-    # 2. Group the math by Topic
     mastery_data = {}
     
     for topic, question, response in results:
@@ -568,21 +570,17 @@ def get_user_mastery(
                 "total_correct": 0
             }
             
-        # Tally up the score
         mastery_data[topic.id]["total_attempted"] += 1
         if response.is_correct:
             mastery_data[topic.id]["total_correct"] += 1
 
-    # 3. Calculate the final percentage and format for Pydantic
     final_output = []
     for data in mastery_data.values():
-        # Prevent division by zero just in case!
-        if data["total_attempted"] > 0:
-            pct = (data["total_correct"] / data["total_attempted"]) * 100
-        else:
-            pct = 0.0
-            
-        data["mastery_percentage"] = round(pct, 1) # Round to 1 decimal place
+        pct = (
+            (data["total_correct"] / data["total_attempted"]) * 100
+            if data["total_attempted"] > 0 else 0.0
+        )
+        data["mastery_percentage"] = round(pct, 1)
         final_output.append(data)
 
     return final_output
@@ -592,7 +590,6 @@ def get_topic_mastery_history(
     session: Session = Depends(get_session), 
     current_user: User = Depends(get_current_user)
 ):
-    # 1. Grab every response, joined with Topic and Attempt, sorted by Date!
     statement = (
         select(Topic, QuizAttempt, Response)
         .join(Question, Question.topic_id == Topic.id)
@@ -603,28 +600,24 @@ def get_topic_mastery_history(
     )
     
     results = session.exec(statement).all()
-
     topics_dict = {}
 
     for topic, attempt, response in results:
-        # Initialize the topic if we haven't seen it yet
         if topic.id not in topics_dict:
             topics_dict[topic.id] = {
                 "topic_id": topic.id,
                 "topic_name": topic.name,
                 "running_correct": 0,
                 "running_total": 0,
-                "history": [] 
+                "history": []
             }
             
         t = topics_dict[topic.id]
         
-        # Add to the running math
         t["running_total"] += 1
         if response.is_correct:
             t["running_correct"] += 1
             
-        # If this is a new attempt for this topic, create a new dot on the chart
         if not t["history"] or t["history"][-1]["attempt_id"] != attempt.id:
             t["history"].append({
                 "attempt_id": attempt.id,
@@ -632,8 +625,8 @@ def get_topic_mastery_history(
                 "percentage": 0.0
             })
             
-        # Constantly update the latest dot's percentage based on the running total
-        t["history"][-1]["percentage"] = round((t["running_correct"] / t["running_total"]) * 100, 1)
+        t["history"][-1]["percentage"] = round(
+            (t["running_correct"] / t["running_total"]) * 100, 1
+        )
 
     return list(topics_dict.values())
-    return list(grouped_data.values())

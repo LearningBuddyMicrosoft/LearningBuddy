@@ -23,29 +23,36 @@ quiz_name = st.session_state.get("last_quiz_name", "Quiz")
 if result_data:
     st.success("Your attempt has been submitted and recorded!")
     
-    col1, col2 = st.columns(2)
-    col1.metric("Quiz", quiz_name)
-    
     score = result_data.get("score", 0) 
-    feedback = result_data.get("feedback") or "No feedback provided."
-    score = result_data.get("score", 0)
+    feedback = (
+        result_data.get("ai_feedback")
+        or result_data.get("feedback")
+        or "No feedback provided."
+    )
+    answers_count = result_data.get(
+        "answers_count",
+        st.session_state.get("last_answers_count", 0)
+    )
+    wrong_questions = result_data.get("wrong_questions", [])
 
-    # 2. Display the top-level metrics
     col1, col2, col3 = st.columns(3)
     col1.metric("Quiz", quiz_name)
     col2.metric("Final Score", score)
     col3.metric("Answered", answers_count)
 
-    st.subheader("Detailed Feedback")
-    st.write(result_data.get("feedback", "No feedback provided."))
-    st.divider()
-    
-    # 3. Display the detailed AI feedback
     st.subheader("AI Feedback")
     with st.container(border=True):
         st.markdown(feedback)
+
+    if wrong_questions:
+        st.subheader("Questions to Review")
+        for index, item in enumerate(wrong_questions, start=1):
+            st.markdown(
+                f"{index}. **Question:** {item.get('question', 'Unknown question')}  \n"
+                f"Your answer: `{item.get('selected_answer', 'No answer')}`  \n"
+                f"Correct answer: `{item.get('correct_answer', 'Unknown')}`"
+            )
     
-    # Optional: A button to clear the recent feedback once they are done reading it
     if st.button("Dismiss Feedback"):
         del st.session_state["last_quiz_result"]
         st.rerun()
