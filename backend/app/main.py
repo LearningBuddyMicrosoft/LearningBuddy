@@ -266,7 +266,7 @@ def process_pdf_in_background(file_path: str, topic_id: int, material_id: int):
                 session=background_session, 
                 topic_id=topic_id, 
                 material_id=material_id, # Pass the material_id instead of pdf_path!
-                num_questions=10 
+                num_questions=50 
             )
             
         except Exception as e:
@@ -313,11 +313,11 @@ def generate_quiz(payload:QuizCreate, session: Session = Depends(get_session),cu
             raise HTTPException(status_code=403, detail=f"You do not have access to topic with ID {topic_id}")
         verified_topics.append(topic)
     if payload.difficulty_level == 1:
-        min_diff, max_diff = 1, 3
+        min_diff, max_diff = 1, 2
     elif payload.difficulty_level == 2:
-        min_diff, max_diff = 4, 7
+        min_diff, max_diff = 3, 4
     elif payload.difficulty_level == 3:
-        min_diff, max_diff = 8, 10
+        min_diff, max_diff = 5, 5
     else:
         raise HTTPException(status_code=400, detail="Invalid difficulty level")
     
