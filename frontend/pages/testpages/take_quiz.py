@@ -1,5 +1,5 @@
 import streamlit as st
-from api_client import submit_batch_answers
+from api_client import submit_batch_answers, finish_attempt
 
 if not st.session_state.get("token"):
     st.switch_page("pages/testpages/login.py")
