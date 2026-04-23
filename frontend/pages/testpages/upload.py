@@ -40,6 +40,7 @@ subjects = dashboard.get("subjects", []) if dashboard else []
 st.subheader("Upload Lecture Material (PDF)")
 
 all_topics = [t for s in subjects for t in s.get("topics", [])]
+uploaded_file = None
 
 if not all_topics:
     st.warning("Create at least one topic before uploading materials.")
@@ -67,5 +68,5 @@ else:
             st.error("Upload failed. Check the backend logs.")
 col1,col2,col3=st.columns([1,2,1])
 with col2:
-    if st.button("Generate Quiz", use_container_width=True,disabled=uploaded_file is None):
+    if st.button("Generate Quiz", use_container_width=True, disabled=not all_topics):
                 st.switch_page("pages/testpages/generate_quiz.py")
