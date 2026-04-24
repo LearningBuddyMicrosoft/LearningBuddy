@@ -23,6 +23,8 @@ from .schemas import (
     FinishAttempt, BatchSubmission
 )
 
+from ai.llm import generate_feedback, generate_single_feedback
+
 app = FastAPI()
 
 @asynccontextmanager
@@ -85,7 +87,7 @@ def start_attempt(payload: StartAttempt, session: Session = Depends(get_session)
     session.refresh(new_attempt)
     return new_attempt
 
-#called everytime a question is answered in single mode
+# Submit a single answer (single-question mode)
 @app.post("/submit-answer/")
 def submit_answer(submission: AnswerSubmission, session: Session = Depends(get_session), current_user: User = Depends(get_current_user)):
     attempt = session.get(QuizAttempt, submission.attempt_id)
@@ -95,11 +97,33 @@ def submit_answer(submission: AnswerSubmission, session: Session = Depends(get_s
     if attempt.user_id != current_user.id:
         raise HTTPException(status_code=403, detail="You do not have access to this attempt")
     
-    new_response = grade_and_build_response(submission,current_user.id, session)
+    question = session.get(Question, submission.question_id)
+    if not question:
+        raise HTTPException(status_code=404, detail="Question not found")
+
+    is_correct = submission.selected_option == question.correct_answer
+
+    # AI explanation for single-question mode
+    ai_feedback = generate_single_feedback(
+        question=question.question_text,
+        your_answer=submission.selected_option,
+        correct_answer=question.correct_answer
+    )
+
+    new_response = Response(
+        user_id=current_user.id,
+        attempt_id=submission.attempt_id,
+        question_id=submission.question_id,
+        selected_option=submission.selected_option,
+        is_correct=is_correct,
+        feedback=ai_feedback.summary
+    )
+
     session.add(new_response)
     session.commit()
     session.refresh(new_response)
     return new_response
+
 
 #called only when quiz is finished in single mode
 @app.post("/finish-attempt/")
@@ -111,24 +135,28 @@ def finish_attempt(submission: FinishAttempt, session: Session = Depends(get_ses
     if attempt.user_id != current_user.id:
         raise HTTPException(status_code=403, detail="You do not have access to this attempt")
     
-    # Calculate score based on responses
+    # Count correct answers
     statement = select(func.count()).where(
         Response.attempt_id == submission.attempt_id,
         Response.is_correct == True
     )
     correct_count = session.exec(statement).one() or 0
+
+    # Count total answers
     total_count = session.exec(
         select(func.count()).where(Response.attempt_id == submission.attempt_id)
     ).one() or 0
 
+    # Collect wrong questions for AI feedback
     wrong_question_rows = session.exec(
-        select(Question.question_text, Response.selected_option, Question.correct_answer).join(
-            Response, Response.question_id == Question.id
-        ).where(
+        select(Question.question_text, Response.selected_option, Question.correct_answer)
+        .join(Response, Response.question_id == Question.id)
+        .where(
             Response.attempt_id == submission.attempt_id,
             Response.is_correct == False
         )
     ).all()
+
     wrong_questions = [
         {
             "question": question_text,
@@ -138,66 +166,83 @@ def finish_attempt(submission: FinishAttempt, session: Session = Depends(get_ses
         for question_text, selected_option, correct_answer in wrong_question_rows
     ]
 
-    # Update the attempt with the final score and feedback
+    # Update score
     attempt.score = int(correct_count)
-    attempt.feedback = generate_feedback(wrong_questions, attempt.score, int(total_count))
 
+    # Generate AI feedback
+    attempt.feedback = generate_feedback(
+        wrong_questions,
+        attempt.score,
+        int(total_count)
+    )
+
+    # Update quiz high score
     quiz = session.get(Quiz, attempt.quiz_id)
     if quiz:
         quiz.highscore = max(quiz.highscore, attempt.score)
         session.add(quiz)
+
     session.add(attempt)
     session.commit()
     session.refresh(attempt)
 
     return attempt
 
+
 #called when quiz is finished in batch mode
 @app.post("/submit-batch-answers/")
 def submit_batch_answers(batch_submission: BatchSubmission, session: Session = Depends(get_session), current_user: User = Depends(get_current_user)):
-    new_attempt = session.get(QuizAttempt, batch_submission.attempt_id)
-    if not new_attempt:
+    attempt = session.get(QuizAttempt, batch_submission.attempt_id)
+    if not attempt:
         raise HTTPException(status_code=404, detail="Attempt not found")
-    if new_attempt.user_id != current_user.id:
+
+    if attempt.user_id != current_user.id:
         raise HTTPException(status_code=403, detail="You do not have access to this attempt")
+
     score = 0
-    wrong_questions = []
     response_list = []
+    responses_payload = []
+
     for answer in batch_submission.answers:
         question = session.get(Question, answer.question_id)
-        new_response = grade_and_build_response(answer,current_user.id, session)
+
+        new_response = grade_and_build_response(answer, current_user.id, session)
         response_list.append(new_response)
 
-        is_correct = new_response.is_correct
-
-        if is_correct:
+        if new_response.is_correct:
             score += 1
-        else:
-            wrong_questions.append(
-                {
-                    "question": question.question_text,
-                    "selected_answer": answer.selected_option,
-                    "correct_answer": question.correct_answer,
-                }
-            )
-        
+
+        responses_payload.append({
+            "question": question.question_text,
+            "your_answer": answer.selected_option,
+            "correct_answer": question.correct_answer
+        })
+
     total_answers = len(batch_submission.answers)
-    overall_feedback = generate_feedback(wrong_questions, score, total_answers)
 
-    new_attempt.score = score
-    new_attempt.feedback = overall_feedback
+    overall_feedback = generate_feedback(
+        score=score,
+        total=total_answers,
+        responses=responses_payload
+    )
 
-    quiz = session.get(Quiz, new_attempt.quiz_id)
+    attempt.score = score
+    attempt.feedback = overall_feedback
+
+    quiz = session.get(Quiz, attempt.quiz_id)
     if quiz:
-        quiz.highscore = max(quiz.highscore, new_attempt.score)
+        quiz.highscore = max(quiz.highscore, attempt.score)
         session.add(quiz)
 
     session.add_all(response_list)
-    session.add(new_attempt)
+    session.add(attempt)
     session.commit()
-    session.refresh(new_attempt)
+    session.refresh(attempt)
 
-    return new_attempt
+    return attempt
+
+
+
 
 def grade_and_build_response(submission: AnswerSubmission, current_user_id: int, session: Session):
     question = session.get(Question, submission.question_id)
@@ -206,81 +251,25 @@ def grade_and_build_response(submission: AnswerSubmission, current_user_id: int,
     
     is_correct = submission.selected_option == question.correct_answer
 
-    #TODO:hardcoded feedback for now, will be calling AI for this in the future
+    # Generate per-question feedback
     if is_correct:
-        feedback = "Correct!"
+        feedback = f"Correct! '{submission.selected_option}' is the right answer."
     else:
-        feedback = "Incorrect. Review the material and try again."
-    
+        feedback = (
+            f"Incorrect. You chose '{submission.selected_option}', "
+            f"but the correct answer is '{question.correct_answer}'."
+        )
+
     response = Response(
         user_id=current_user_id,
         attempt_id=submission.attempt_id,
         question_id=submission.question_id,
         selected_option=submission.selected_option,
         is_correct=is_correct,
-        feedback=feedback   
-        )
+        feedback=feedback
+    )
     return response
 
-def build_fallback_feedback(score: int, total: int) -> str:
-    if total == 0:
-        return "No answers were submitted."
-
-    percentage = score / total
-    if percentage == 1:
-        return f"Perfect score: {score} out of {total} correct."
-    if percentage >= 0.7:
-        return f"Nice work: {score} out of {total} correct."
-    if percentage >= 0.4:
-        return f"Good effort: {score} out of {total} correct. Keep practicing."
-    return f"{score} out of {total} correct. Review the material and try again."
-
-def generate_feedback(wrong_questions, score: int, total: int) -> str:
-    if total == 0:
-        return "No questions were answered."
-
-    if not wrong_questions:
-        return f"Excellent work - you scored {score}/{total} with no mistakes."
-
-    if not OLLAMA_URL:
-        return build_fallback_feedback(score, total)
-
-    prompt = f"""
-You are an expert tutor.
-
-A student scored {score}/{total}.
-
-They got the following questions wrong:
-
-{json.dumps(wrong_questions, indent=2)}
-
-Provide:
-1. A short performance summary
-2. Key weak concepts
-3. Specific advice for improvement
-
-Keep it concise, structured, and encouraging.
-"""
-
-    try:
-        response = requests.post(
-            f"{OLLAMA_URL}/api/generate",
-            json={
-                "model": FEEDBACK_MODEL,
-                "prompt": prompt,
-                "stream": False,
-                "options": {
-                    "temperature": 0.3,
-                    "num_predict": 300
-                }
-            },
-            timeout=60,
-        )
-        response.raise_for_status()
-        content = response.json().get("response", "")
-        return content.strip() if content else build_fallback_feedback(score, total)
-    except Exception:
-        return build_fallback_feedback(score, total)
 
 @app.get("/dashboard", response_model=DashboardRead)
 def get_user_dashboard(current_user: User = Depends(get_current_user), session: Session = Depends(get_session)):

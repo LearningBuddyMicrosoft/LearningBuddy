@@ -9,6 +9,7 @@ from sqlmodel import Session, select
 from .database_insertion import questions_to_models, save_questions
 from .models import DocumentChunk, Topic
 from .pdf_processor import get_embedding
+from ai.llm import llm, final_answer_prompt
 
 OLLAMA_URL = os.getenv("OLLAMA_URL")
 
@@ -80,185 +81,112 @@ def generate_and_store_quiz(session, topic_id: int, material_id: int, num_questi
 
 
 def generate_questions_from_context(context_text: str, num_questions: int, difficulty: int) -> list[dict]:
-    if not context_text or not context_text.strip():
-        print("⚠️ Empty context provided.")
+    if not context_text.strip():
         return []
 
-    prompt = f"""
-You are an exam question generator.
-
-You must output ONLY a valid JSON array.
-
-No explanations.
-No text.
-No markdown.
-No comments.
-
-TASK:
-Create {num_questions} multiple-choice questions using ONLY the facts in the context.
-
-IMPORTANT:
-- ALL questions must have difficulty = {difficulty}
-- Do NOT mix difficulty levels
-- If context is insufficient, return fewer questions
-
-OUTPUT FORMAT (STRICT):
-[
-  {{
-    "question_type": "MCQ",
-    "difficulty": {difficulty},
-    "question_text": "string",
-    "options": ["A", "B", "C", "D"],
-    "correct_answer": "string"
-  }}
-]
-
-RULES:
-- correct_answer must match one option exactly
-- always return a JSON array
-- no extra keys allowed
-
-CONTEXT:
-{context_text}
-"""
-
-    print("🧠 PROMPT (truncated):\n", prompt[:800])
-
     for attempt in range(3):
-        print(f"🔁 Attempt {attempt + 1}/3 (difficulty {difficulty})")
+        print(f"🔁 Attempt {attempt + 1}/3 for difficulty {difficulty}")
 
         try:
-            response = requests.post(
-                f"{OLLAMA_URL}/api/generate",
-                json={
-                    "model": "ollama3.1",
-                    "prompt": prompt,
-                    "stream": False,
-                    "options": {
-                        "num_predict": 2048,
-                        "temperature": 0,
-                        "top_p": 1
-                    }
-                },
-                timeout=120
+            prompt = final_answer_prompt.format_prompt(
+                context=context_text,
+                num_questions=num_questions,
+                difficulty=difficulty
             )
 
-            response.raise_for_status()
+            generation = llm.generate([prompt.to_messages()])
+            raw_text = generation.generations[0][0].text if generation.generations else ""
 
         except Exception as e:
-            print(f"❌ Request failed: {e}")
+            print(f"❌ LLM error: {e}")
             continue
 
-        raw_text = response.json().get("response", "")
-        print("🤖 RAW OUTPUT:\n", raw_text[:800])
+        if not raw_text:
+            continue
 
-        parsed_questions = parse_llm_json(raw_text)
+        raw_text = raw_text.strip()
 
+        # Parse JSON using your ResponseModel
+        try:
+            data = json.loads(raw_text)
+            mcqs = data.get("mcqs", [])
+        except Exception:
+            print("❌ JSON parse error")
+            continue
+
+        # Validate MCQs
         def is_valid(q):
             return (
                 isinstance(q, dict)
-                and q.get("question_text")
+                and q.get("question")
                 and isinstance(q.get("options"), list)
-                and len(q.get("options", [])) >= 2
-                and q.get("correct_answer")
-                and q.get("difficulty") == difficulty
+                and len(q.get("options", [])) == 4
+                and q.get("answer") in ["A", "B", "C", "D"]
+                and q.get("evidence")
+                and q.get("source")
             )
 
-        parsed_questions = [q for q in parsed_questions if is_valid(q)]
+        valid = [q for q in mcqs if is_valid(q)]
+        print(f"🧪 Valid MCQs before hallucination filtering: {len(valid)}")
 
-        print(f"✅ VALID QUESTIONS: {len(parsed_questions)}")
+        # Hallucination filtering
+        grounded = []
+        for q in valid:
+            score_info = calculate_hallucination_score(
+                response=q["evidence"],
+                context=[{"text": context_text}]
+            )
+            if score_info["score"] <= 0.5:
+                grounded.append(q)
 
-        # ✅ STRICT success condition
-        if len(parsed_questions) == num_questions:
-            return parsed_questions
+        print(f"🛡️ Grounded MCQs after hallucination filtering: {len(grounded)}")
 
-        # ⚠️ fallback if decent output
-        if len(parsed_questions) >= 5:
-            print("⚠️ Partial success, returning fallback set")
-            return parsed_questions
+        if len(grounded) == num_questions:
+            return grounded
+
+        if len(grounded) >= 5:
+            return grounded
 
     print(f"❌ Failed to generate difficulty {difficulty} questions")
     return []
 
 
-def retrieve_relevant_context(topic_name: str, material_id: int, session: Session, limit: int = 4) -> str:
-    print(f"🔍 Searching database for chunks related to: '{topic_name}'...")
 
-    augmented_query = f"{topic_name}: important educational concepts, core definitions, and main ideas."
-    query_vector = get_embedding(augmented_query)
+def retrieve_relevant_context(topic_name: str, material_id: int, session: Session, limit: int = 8) -> str:
+    print(f"🔍 Retrieving chunks for topic '{topic_name}'")
+
+    query_text = f"{topic_name}: key concepts, definitions, and core ideas"
+    query_vector = get_embedding(query_text)
 
     if not query_vector:
         return ""
 
-    statement = select(DocumentChunk).where(
-        DocumentChunk.material_id == material_id
-    ).order_by(
-        DocumentChunk.embedding.cosine_distance(query_vector)
-    ).limit(limit)
+    statement = (
+        select(DocumentChunk)
+        .where(DocumentChunk.material_id == material_id)
+        .order_by(DocumentChunk.embedding.cosine_distance(query_vector))
+        .limit(limit)
+    )
 
     results = session.exec(statement).all()
-
     if not results:
         print("⚠️ No chunks found")
         return ""
 
-    filtered_results = []
-
+    filtered = []
     for chunk in results:
         text = chunk.text_content.lower()
-
-        if any(bad in text for bad in [
-            "hello", "founder", "students", "academy",
-            "courses", "career", "welcome"
-        ]):
+        if any(bad in text for bad in ["hello", "welcome", "academy", "career", "students", "founder"]):
             continue
+        filtered.append(chunk)
 
-        filtered_results.append(chunk)
+    if not filtered:
+        filtered = results
 
-    if not filtered_results:
-        print("⚠️ All chunks filtered out, using original results")
-        filtered_results = results
+    combined = []
+    for chunk in filtered:
+        combined.append(f"[Chunk {chunk.id}]\n{chunk.text_content}")
 
-    combined_context = "\n".join(
-        chunk.text_content[:300]
-        for chunk in filtered_results
-    )
-
-    return combined_context
+    return "\n\n--- NEXT CHUNK ---\n\n".join(combined)
 
 
-def parse_llm_json(raw_text: str) -> list:
-    clean_text = re.sub(r"```json\n?|\n?```", "", raw_text).strip()
-
-    start_idx = clean_text.find('[')
-    alt_start = clean_text.find('{')
-
-    if start_idx == -1 and alt_start == -1:
-        print("❌ No JSON brackets found in output.")
-        return []
-
-    if start_idx != -1 and (alt_start == -1 or start_idx < alt_start):
-        clean_text = clean_text[start_idx:]
-    else:
-        clean_text = clean_text[alt_start:]
-
-    try:
-        data = json.loads(clean_text)
-
-        if isinstance(data, dict):
-            if "questions" in data and isinstance(data["questions"], list):
-                return data["questions"]
-            elif "Questions" in data and isinstance(data["Questions"], list):
-                return data["Questions"]
-            else:
-                return [data]
-
-        if isinstance(data, list):
-            return data
-
-        return []
-
-    except json.JSONDecodeError as e:
-        print(f"❌ JSON Parsing Error: {e}")
-        print(f"RAW TEXT WAS:\n{raw_text}")
-        return []
