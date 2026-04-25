@@ -1,5 +1,6 @@
+--extra-index-url https://download.pytorch.org/whl/cpu
 fastapi
-uvicorn
+uvicorn==0.24.0
 sqlmodel
 psycopg2-binary
 python-multipart
@@ -12,10 +13,14 @@ python-pptx
 pillow
 requests
 pgvector
-langchain-core==1.2.22
-langchain-community==0.4.1
-langchain-text-splitters==1.1.1
-langchain-classic==1.0.3
+langchain
+langchain-core
+langchain-community
+langchain-text-splitters
+langchain-ollama
 pydantic
 pydantic-settings
 PyJWT
+numpy<2
+sentence-transformers
+torch

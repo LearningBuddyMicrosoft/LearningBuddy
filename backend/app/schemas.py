@@ -31,6 +31,7 @@ class MaterialRead(BaseModel):
     id: int
     name: str
     file_path: str
+    processing_status: str
 
 class TopicDetailedRead(BaseModel):
     id: int
@@ -71,6 +72,7 @@ class QuestionRead(SQLModel):
     question_text: str
     options: List[str] = []
     correct_answer: str
+    explanation: str
 
 class QuizRead(SQLModel):
     id: int

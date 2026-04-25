@@ -82,6 +82,8 @@ class Question(SQLModel, table=True):
     question_text: str
     options: Optional[List[str]] = Field(default_factory=list, sa_column=Column(JSON))
     correct_answer: str
+    explanation: str = Field(default="")
+    source: str = Field(default="")
 
 
 # This class defines both a Python Object AND a Database Table
@@ -106,10 +108,15 @@ class Material(SQLModel, table=True):
 
     topic_id: int = Field(foreign_key="topic.id")
     topic: Topic = Relationship(back_populates="materials")
-    chunks: List["DocumentChunk"] = Relationship(back_populates="material")
+    chunks: List["DocumentChunk"] = Relationship(
+        back_populates="material",
+        sa_relationship_kwargs={"cascade": "all, delete-orphan"}
+    )
+
 
     name: str
     file_path: str
+    processing_status: str = Field(default="uploaded")  # uploaded, embedding, generating_quiz, ready, failed
 
 class Response(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)

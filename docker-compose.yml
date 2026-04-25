@@ -1,4 +1,3 @@
-  version: '3.8'
 
   services:
     frontend:
@@ -9,7 +8,7 @@
       volumes:
         - ./frontend:/app
       environment:
-        - BACKEND_URL=http://backend:8000 
+        - BACKEND_URL=http://backend:8000
       depends_on:
         - backend
 
@@ -22,9 +21,11 @@
       env_file:
         - .env
       volumes:
-        - ./backend:/app/backend
+        - ./backend:/app
         - ./ai:/app/ai
-      command: uvicorn backend.app.main:app --host 0.0.0.0 --port 8000 --reload --reload-dir /app/backend
+      command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload --reload-dir /app
+      environment:
+        - OLLAMA_URL=http://ollama:11434
       depends_on:
         db:
           condition: service_healthy
@@ -46,5 +47,23 @@
         timeout: 5s
         retries: 5
 
+    ollama:
+      build:
+        context: .
+        dockerfile: Dockerfile.ollama
+      ports:
+        - "11434:11434"
+      volumes:
+        - ollama_data:/root/.ollama
+      environment:
+        - OLLAMA_NUM_GPU=1
+      healthcheck:
+        test: ["CMD", "curl", "-f", "http://localhost:11434/api/tags"]
+        interval: 30s
+        timeout: 30s
+        retries: 10
+        start_period: 120s
+
   volumes:
     postgres_data:
+    ollama_data:

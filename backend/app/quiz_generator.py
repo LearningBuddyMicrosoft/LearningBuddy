@@ -1,20 +1,15 @@
-import json
-import os
-import re
-import requests
-from collections import defaultdict
+# backend/app/quiz_generator.py
 
+from typing import List, Dict, Any
 from sqlmodel import Session, select
 
 from .database_insertion import questions_to_models, save_questions
-from .models import DocumentChunk, Topic
+from .models import DocumentChunk, Topic, Material
 from .pdf_processor import get_embedding
-from ai.llm import llm, final_answer_prompt
-
-OLLAMA_URL = os.getenv("OLLAMA_URL")
+from ai.llm import generate_quiz_fast
 
 
-def generate_and_store_quiz(session, topic_id: int, material_id: int, num_questions: int = 50):
+def generate_and_store_quiz(session, topic_id: int, material_id: int, num_questions: int = 10):
     print(f"🚀 STARTING RAG QUIZ GENERATION FOR MATERIAL #{material_id}")
 
     topic = session.get(Topic, topic_id)
@@ -26,51 +21,45 @@ def generate_and_store_quiz(session, topic_id: int, material_id: int, num_questi
     print(f"🎯 Search Target: '{topic_name}'")
 
     print("📚 Searching vector database for relevant chunks...")
-    context = retrieve_relevant_context(
+    context_chunks = retrieve_relevant_context(
         topic_name=topic_name,
         material_id=material_id,
         session=session,
-        limit=8
+        limit=30,  # reduced from 20 to avoid overwhelming the model
     )
 
-    if not context.strip():
+    if not context_chunks:
         print("❌ No relevant context found in the database. Aborting.")
         return
 
-    print("🧠 Generating questions per difficulty level...")
+    print(f"🧠 Generating exactly {num_questions} questions in batched LLM calls...")
 
-    all_questions = []
-
-    # ✅ Generate 10 questions per difficulty level (1–3)
-    for difficulty in range(1, 4):
-        print(f"\n🎯 Generating difficulty {difficulty} questions...")
-
-        questions = generate_questions_from_context(
-            context_text=context,
-            num_questions=20,
-            difficulty=difficulty
+    try:
+        mcqs = generate_quiz_fast(
+            context_chunks=context_chunks,
+            num_questions=num_questions,
+            max_attempts=80,
         )
-
-        all_questions.extend(questions)
-
-    print(f"\n🤖 Total generated questions: {len(all_questions)}")
-
-    if not all_questions:
-        print("❌ No valid questions generated.")
+    except Exception as e:
+        print(f"❌ LLM error while generating quiz: {e}")
         return
 
-    # ✅ Safety rebalance (ensures max 10 per difficulty)
-    bucket = defaultdict(list)
-
-    for q in all_questions:
-        bucket[q["difficulty"]].append(q)
+    if not mcqs:
+        print("❌ No questions generated.")
+        return
 
     final_questions = []
-
-    for d in range(1, 4):
-        selected = bucket[d][:10]
-        print(f"✅ Difficulty {d}: {len(selected)} questions")
-        final_questions.extend(selected)
+    for mcq in mcqs:
+        final_questions.append(
+            {
+                "question": mcq.question,
+                "options": mcq.options,
+                "answer": mcq.answer,
+                "explanation": mcq.explanation,
+                "difficulty": mcq.difficulty,
+                "source": mcq.source,
+            }
+        )
 
     print(f"\n💾 SAVING {len(final_questions)} QUESTIONS TO DB...")
 
@@ -80,86 +69,19 @@ def generate_and_store_quiz(session, topic_id: int, material_id: int, num_questi
     print("✅ Success! RAG pipeline complete.")
 
 
-def generate_questions_from_context(context_text: str, num_questions: int, difficulty: int) -> list[dict]:
-    if not context_text.strip():
-        return []
-
-    for attempt in range(3):
-        print(f"🔁 Attempt {attempt + 1}/3 for difficulty {difficulty}")
-
-        try:
-            prompt = final_answer_prompt.format_prompt(
-                context=context_text,
-                num_questions=num_questions,
-                difficulty=difficulty
-            )
-
-            generation = llm.generate([prompt.to_messages()])
-            raw_text = generation.generations[0][0].text if generation.generations else ""
-
-        except Exception as e:
-            print(f"❌ LLM error: {e}")
-            continue
-
-        if not raw_text:
-            continue
-
-        raw_text = raw_text.strip()
-
-        # Parse JSON using your ResponseModel
-        try:
-            data = json.loads(raw_text)
-            mcqs = data.get("mcqs", [])
-        except Exception:
-            print("❌ JSON parse error")
-            continue
-
-        # Validate MCQs
-        def is_valid(q):
-            return (
-                isinstance(q, dict)
-                and q.get("question")
-                and isinstance(q.get("options"), list)
-                and len(q.get("options", [])) == 4
-                and q.get("answer") in ["A", "B", "C", "D"]
-                and q.get("evidence")
-                and q.get("source")
-            )
-
-        valid = [q for q in mcqs if is_valid(q)]
-        print(f"🧪 Valid MCQs before hallucination filtering: {len(valid)}")
-
-        # Hallucination filtering
-        grounded = []
-        for q in valid:
-            score_info = calculate_hallucination_score(
-                response=q["evidence"],
-                context=[{"text": context_text}]
-            )
-            if score_info["score"] <= 0.5:
-                grounded.append(q)
-
-        print(f"🛡️ Grounded MCQs after hallucination filtering: {len(grounded)}")
-
-        if len(grounded) == num_questions:
-            return grounded
-
-        if len(grounded) >= 5:
-            return grounded
-
-    print(f"❌ Failed to generate difficulty {difficulty} questions")
-    return []
-
-
-
-def retrieve_relevant_context(topic_name: str, material_id: int, session: Session, limit: int = 8) -> str:
+def retrieve_relevant_context(
+    topic_name: str,
+    material_id: int,
+    session: Session,
+    limit: int = 20,
+) -> List[Dict[str, Any]]:
     print(f"🔍 Retrieving chunks for topic '{topic_name}'")
 
     query_text = f"{topic_name}: key concepts, definitions, and core ideas"
     query_vector = get_embedding(query_text)
 
     if not query_vector:
-        return ""
+        return []
 
     statement = (
         select(DocumentChunk)
@@ -171,8 +93,9 @@ def retrieve_relevant_context(topic_name: str, material_id: int, session: Sessio
     results = session.exec(statement).all()
     if not results:
         print("⚠️ No chunks found")
-        return ""
+        return []
 
+    # Filter out useless intro text
     filtered = []
     for chunk in results:
         text = chunk.text_content.lower()
@@ -183,10 +106,6 @@ def retrieve_relevant_context(topic_name: str, material_id: int, session: Sessio
     if not filtered:
         filtered = results
 
-    combined = []
-    for chunk in filtered:
-        combined.append(f"[Chunk {chunk.id}]\n{chunk.text_content}")
-
-    return "\n\n--- NEXT CHUNK ---\n\n".join(combined)
-
-
+    material = session.get(Material, material_id)
+    filename = material.name.replace(".pdf", "") if material else "Document"
+    return [{"id": c.id, "text": c.text_content, "filename": filename} for c in filtered]

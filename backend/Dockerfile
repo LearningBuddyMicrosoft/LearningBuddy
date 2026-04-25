@@ -12,4 +12,4 @@ COPY backend/ .
 # Expose FastAPI's default port
 EXPOSE 8000
 # The command to start the server (we override this in docker-compose with --reload for dev mode)
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["python", "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]

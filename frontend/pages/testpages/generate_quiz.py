@@ -1,4 +1,5 @@
 import streamlit as st
+from pathlib import Path
 from api_client import get_dashboard, generate_quiz, start_quiz, start_attempt
 from pages.testpages.styles1 import apply_custom_css
 apply_custom_css()
@@ -21,7 +22,11 @@ with st.sidebar:
 st.markdown("Generate a quiz") 
 col1,col2,col3=st.columns([1,1,1])
 with col2:
-    st.image("logo.png",width=400)
+    logo_path = Path(__file__).resolve().parents[2] / "logo.png"
+    if logo_path.exists():
+        st.image(logo_path.read_bytes(), width=400)
+    else:
+        st.warning("Logo file not found.")
 st.caption("Select topics, configure your quiz, and let AI build it for you.")
 st.markdown("<hr style='margin:0.2rem 0; border:1px solid #eee'>", unsafe_allow_html=True)
 
