@@ -1,0 +1,36 @@
+sequenceDiagram
+    autonumber
+    
+    actor Student
+    participant Frontend as Frontend (StreamLit)
+    participant Backend as FastAPI Backend
+    participant DB as PostgreSQL (pgvector)
+    participant AI as Ollama LLM
+
+    rect rgb(232, 245, 233)
+        Note right of Student: Phase 1: Upload & Asynchronous Processing
+        Student->>Frontend: Uploads PDF Material
+        Frontend->>Backend: POST /materials/upload
+        
+        %% Async background task starts here
+        Backend->>AI: Send chunks for Embeddings & Question Generation
+        Note over AI: LLM processes text chunks<br/>and generates questions ahead of time
+        AI-->>Backend: Return Vectors & Generated Questions (JSON)
+        
+        Backend->>DB: Store DocumentChunks, Vectors, and Questions
+        DB-->>Backend: Confirm storage
+        Backend-->>Frontend: 200 OK (Upload & Processing Complete)
+    end
+    
+    rect rgb(255, 243, 224)
+        Note right of Student: Phase 2: Quiz Generation & Execution
+        Student->>Frontend: Clicks "Start Quiz"
+        Frontend->>Backend: POST /quizzes/generate/ (topic_id, length)
+        
+        %% Fast synchronous retrieval
+        Backend->>DB: SQL Query: Select [length] random/targeted questions for [topic_id]
+        DB-->>Backend: Return pre-generated questions
+        
+        Backend-->>Frontend: Return Quiz Data payload
+        Frontend-->>Student: Display the first question
+    end

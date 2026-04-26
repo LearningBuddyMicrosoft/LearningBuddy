@@ -1,0 +1,23 @@
+flowchart TD
+    %% Node Styling
+    classDef client fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px
+    classDef container fill:#e3f2fd,stroke:#1565c0,stroke-width:2px
+    classDef database fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px
+    classDef ai fill:#fff3e0,stroke:#e65100,stroke-width:2px
+
+    %% Outside the system
+    User((Student Browser)):::client
+    Ollama[Ollama Server Local LLM]:::ai
+
+    %% Your Docker Environment
+    subgraph DockerNetwork [Docker Compose Environment]
+        Frontend[Frontend Container Vue/React]:::container
+        Backend[Backend Container FastAPI]:::container
+        DB[(PostgreSQL pgvector)]:::database
+    end
+
+    %% Connections
+    User -->|HTTP and HTTPS| Frontend
+    Frontend -->|Port 8000| Backend
+    Backend -->|Port 5432| DB
+    Backend -->|Port 11434| Ollama

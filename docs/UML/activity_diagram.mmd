@@ -1,0 +1,34 @@
+flowchart TD
+    %% Standard UML Activity Diagram Start and End nodes
+    Start((Start))
+    Finish(((End)))
+
+    Start --> Login[Authenticate User]
+    Login --> Dashboard[View Dashboard]
+
+    Dashboard --> CheckSetup{Topic Exists?}
+    
+    %% Setup Branch
+    CheckSetup -->|No| CreateTopic[Create Subject and Topic]
+    CreateTopic --> Upload[Upload PDF Material]
+    
+    CheckSetup -->|Yes| Upload
+
+    %% Parallel Processing Path
+    Upload --> Async[Background: Process PDF and Generate Vectors]
+    Upload --> TakeQuiz[Select Topic to Start Quiz]
+
+    %% Quiz Loop
+    TakeQuiz --> FetchQ[Retrieve Pre-generated Questions]
+    FetchQ --> Answer[Submit Answer]
+    
+    Answer --> Grade[AI Evaluates and Grades]
+    Grade --> MoreQ{More Questions?}
+
+    MoreQ -->|Yes| Answer
+    
+    %% Conclusion Path
+    MoreQ -->|No| Review[Review Final Score and Mistakes]
+    Review --> UpdateMastery[Update Mastery Statistics]
+    
+    UpdateMastery --> Finish
