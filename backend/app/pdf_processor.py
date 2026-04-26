@@ -44,7 +44,7 @@ def get_embedding(text: str, model: str = EMBEDDING_MODEL) -> List[float]:
             "payload": {
                 "model": model,
                 "prompt": text,
-                "options": {"num_ctx": 8192},
+                "options": {"num_ctx": 2048},
                 "truncate": True,
             },
         },

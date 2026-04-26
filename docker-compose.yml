@@ -57,6 +57,9 @@
         - ollama_data:/root/.ollama
       environment:
         - OLLAMA_NUM_GPU=1
+        - OLLAMA_EMBEDDING_MODEL=${OLLAMA_EMBEDDING_MODEL}
+        - OLLAMA_QUIZ_MODEL=${OLLAMA_QUIZ_MODEL}
+        - OLLAMA_FEEDBACK_MODEL=${OLLAMA_FEEDBACK_MODEL}
       healthcheck:
         test: ["CMD", "curl", "-f", "http://localhost:11434/api/tags"]
         interval: 30s

@@ -21,9 +21,10 @@ from .schemas import (
     UserCreate, StartAttempt, AnswerSubmission,
     FinishAttempt, BatchSubmission
 )
-from ai.llm import generate_feedback_fast
+from ai.llm import generate_quiz_fast, generate_feedback_fast
 
-# this sets up the app lifecycle (startup/shutdown)
+
+# App lifecycle (startup/shutdown)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     print("🚀 App starting up: Creating database and tables...")
@@ -33,10 +34,13 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(lifespan=lifespan)
 
-# this registers a new user
+
+# Register a new user
 @app.post("/register/")
 def register_user(user_create: UserCreate, session: Session = Depends(get_session)):
-    existing_user = session.exec(select(User).where(User.username == user_create.username)).first()
+    existing_user = session.exec(
+        select(User).where(User.username == user_create.username)
+    ).first()
     if existing_user:
         raise HTTPException(status_code=400, detail="Username already taken")
 
@@ -47,19 +51,27 @@ def register_user(user_create: UserCreate, session: Session = Depends(get_sessio
     session.refresh(new_user)
     return {"message": "User registered successfully", "user_id": new_user.id}
 
-# this logs a user in and returns a JWT
+
+# Log in and return JWT
 @app.post("/login/")
 def login_user(user_create: UserCreate, session: Session = Depends(get_session)):
-    user = session.exec(select(User).where(User.username == user_create.username)).first()
+    user = session.exec(
+        select(User).where(User.username == user_create.username)
+    ).first()
     if not user or not verify_password(user_create.password, user.hashed_password):
         raise HTTPException(status_code=401, detail="Invalid username or password")
 
     access_token = create_access_token(data={"user_id": user.id})
     return {"access_token": access_token, "token_type": "bearer"}
 
-# this starts a new quiz attempt
+
+# Start a new quiz attempt
 @app.post("/start-attempt/")
-def start_attempt(payload: StartAttempt, session: Session = Depends(get_session), current_user: User = Depends(get_current_user)):
+def start_attempt(
+    payload: StartAttempt,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+):
     quiz = session.get(Quiz, payload.quiz_id)
     if not quiz:
         raise HTTPException(status_code=404, detail="Quiz not found")
@@ -79,9 +91,14 @@ def start_attempt(payload: StartAttempt, session: Session = Depends(get_session)
     session.refresh(new_attempt)
     return new_attempt
 
-# this handles batch answer submission (exam-style, one submit at the end)
+
+# Submit all answers in one go (exam-style)
 @app.post("/submit-batch-answers/")
-def submit_batch_answers(batch_submission: BatchSubmission, session: Session = Depends(get_session), current_user: User = Depends(get_current_user)):
+def submit_batch_answers(
+    batch_submission: BatchSubmission,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+):
     attempt = session.get(QuizAttempt, batch_submission.attempt_id)
     if not attempt:
         raise HTTPException(status_code=404, detail="Attempt not found")
@@ -90,7 +107,7 @@ def submit_batch_answers(batch_submission: BatchSubmission, session: Session = D
         raise HTTPException(status_code=403, detail="You do not have access to this attempt")
 
     score = 0
-    response_list = []
+    response_list: List[Response] = []
 
     for answer in batch_submission.answers:
         question = session.get(Question, answer.question_id)
@@ -104,7 +121,6 @@ def submit_batch_answers(batch_submission: BatchSubmission, session: Session = D
             score += 1
 
     total_answers = len(batch_submission.answers)
-
     attempt.score = score
 
     quiz = session.get(Quiz, attempt.quiz_id)
@@ -120,63 +136,142 @@ def submit_batch_answers(batch_submission: BatchSubmission, session: Session = D
     return {
         "attempt_id": attempt.id,
         "score": score,
-        "total": total_answers
+        "total": total_answers,
     }
 
-# this generates full feedback after all answers are submitted
+
+# Finish attempt and generate AI feedback for the results page
 @app.post("/finish-attempt/")
-def finish_attempt(submission: FinishAttempt, session: Session = Depends(get_session), current_user: User = Depends(get_current_user)):
+def finish_attempt(
+    submission: FinishAttempt,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+):
+    # Load attempt and check ownership
     attempt = session.get(QuizAttempt, submission.attempt_id)
     if not attempt:
         raise HTTPException(status_code=404, detail="Attempt not found")
-
     if attempt.user_id != current_user.id:
         raise HTTPException(status_code=403, detail="You do not have access to this attempt")
 
+    # Load all questions + responses for this attempt in submission order
     rows = session.exec(
         select(Question, Response)
         .join(Response, Response.question_id == Question.id)
         .where(Response.attempt_id == submission.attempt_id)
+        .order_by(Response.id.asc())
     ).all()
 
     if not rows:
         raise HTTPException(status_code=400, detail="No responses found for this attempt")
 
-    # fetch material name for this attempt's quiz topic
+    # Get material name for feedback context
     quiz = session.get(Quiz, attempt.quiz_id)
     material = session.exec(
-        select(Material).where(Material.topic_id == quiz.topics[0].id).order_by(Material.id.desc())
+        select(Material)
+        .where(Material.topic_id == quiz.topics[0].id)
+        .order_by(Material.id.desc())
     ).first()
     material_name = material.name.replace(".pdf", "") if material else "your material"
 
+    # Build payloads for the LLM
     questions_payload = []
     answers_payload = {}
 
-    for question, response in rows:
+    for i, (question, response) in enumerate(rows, start=1):
         questions_payload.append({
+            "id": question.id,
+            "question_number": i,
             "question": question.question_text,
             "correct_answer": question.correct_answer,
             "explanation": question.explanation,
-            "source": question.source
+            "source": question.source,
         })
         answers_payload[str(question.id)] = response.selected_option
 
-    feedback = generate_feedback_fast(questions_payload, answers_payload, material_name=material_name)
+    # Try generating AI feedback via LLM
+    try:
+        feedback = generate_feedback_fast(
+            questions_payload,
+            answers_payload,
+            material_name=material_name,
+        )
+        # Expecting feedback as a dict: {"summary": str, "details": [ ... ]}
+    except Exception as e:
+        print(f"LLM feedback failed, using fallback: {e}")
 
-    attempt.feedback = feedback.summary
+        score = attempt.score
+        total = len(rows)
+        pct = (score / total * 100) if total > 0 else 0
+
+        if pct == 100:
+            summary = f"You scored {score}/{total} — perfect score!"
+        elif pct >= 80:
+            summary = f"You scored {score}/{total} — excellent work!"
+        elif pct >= 60:
+            summary = f"You scored {score}/{total} — good effort!"
+        elif pct >= 40:
+            summary = f"You scored {score}/{total} — keep going!"
+        else:
+            summary = f"You scored {score}/{total} — review the material and try again."
+
+        # Build fallback details in the same shape as LLM output
+        details = []
+        for question, response in rows:
+            details.append({
+                "question": question.question_text,
+                "your_answer": answers_payload.get(str(question.id), "No answer"),
+                "correct_answer": question.correct_answer,
+                "explanation": question.explanation,
+                "source": question.source,
+                "practice_tip": "",
+            })
+
+        feedback = {
+            "summary": summary,
+            "details": details,
+        }
+
+    # Persist summary to attempt
+    attempt.feedback = feedback["summary"]
     session.add(attempt)
     session.commit()
     session.refresh(attempt)
 
-    return feedback
+    # Convert feedback details into graded_questions for the frontend
+    graded_questions = []
+    for item in feedback["details"]:
+        graded_questions.append({
+            "question_text": item.get("question") or item.get("question_text", ""),
+            "your_answer": item.get("your_answer", ""),
+            "correct_answer": item.get("correct_answer", ""),
+            "explanation": item.get("explanation", ""),
+            "practice_tip": item.get("practice_tip", ""),
+            "source": item.get("source", ""),
+        })
 
-# this builds a Response row and basic per-question feedback (no LLM)
-def grade_and_build_response(submission: AnswerSubmission, current_user_id: int, session: Session):
+    # Return structure the results page expects
+    return {
+        "score": attempt.score,
+        "summary": feedback["summary"],
+        "graded_questions": graded_questions,
+    }
+
+
+# Build a Response row and basic per-question feedback (no LLM)
+def grade_and_build_response(
+    submission: AnswerSubmission,
+    current_user_id: int,
+    session: Session,
+):
     question = session.get(Question, submission.question_id)
     if not question:
         raise HTTPException(status_code=404, detail="Question not found")
 
-    is_correct = submission.selected_option.strip().lower() == question.correct_answer.strip().lower()
+    is_correct = (
+        str(submission.selected_option).strip().lower()
+        == str(question.correct_answer).strip().lower()
+    )
 
     if is_correct:
         feedback = f"Correct! '{submission.selected_option}' is the right answer."
@@ -192,18 +287,27 @@ def grade_and_build_response(submission: AnswerSubmission, current_user_id: int,
         question_id=submission.question_id,
         selected_option=submission.selected_option,
         is_correct=is_correct,
-        feedback=feedback
+        feedback=feedback,
     )
     return response
 
-# this returns the current user's dashboard data
+
+# Return current user's dashboard data
 @app.get("/dashboard", response_model=DashboardRead)
-def get_user_dashboard(current_user: User = Depends(get_current_user), session: Session = Depends(get_session)):
+def get_user_dashboard(
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
     return current_user
 
-# this returns detailed info for a topic
+
+# Return detailed info for a topic
 @app.get("/topics/{topic_id}/details", response_model=TopicDetailedRead)
-def get_topic_details(topic_id: int, session: Session = Depends(get_session), current_user: User = Depends(get_current_user)):
+def get_topic_details(
+    topic_id: int,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+):
     topic = session.get(Topic, topic_id)
     if not topic:
         raise HTTPException(status_code=404, detail="Topic not found")
@@ -211,21 +315,31 @@ def get_topic_details(topic_id: int, session: Session = Depends(get_session), cu
         raise HTTPException(status_code=403, detail="You do not have access to this topic")
     return topic
 
-# this creates a new subject for the current user
+
+# Create a new subject
 @app.post("/subjects/")
-def create_subject(payload: SubjectCreate, session: Session = Depends(get_session), current_user: User = Depends(get_current_user)):
+def create_subject(
+    payload: SubjectCreate,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+):
     new_subject = Subject(
         user_id=current_user.id,
-        name=payload.name
+        name=payload.name,
     )
     session.add(new_subject)
     session.commit()
     session.refresh(new_subject)
     return new_subject
 
-# this creates a new topic under a subject
+
+# Create a new topic under a subject
 @app.post("/topics/")
-def create_topic(payload: TopicCreate, session: Session = Depends(get_session), current_user: User = Depends(get_current_user)):
+def create_topic(
+    payload: TopicCreate,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+):
     subject = session.get(Subject, payload.subject_id)
     if not subject:
         raise HTTPException(status_code=404, detail="Subject not found")
@@ -234,13 +348,15 @@ def create_topic(payload: TopicCreate, session: Session = Depends(get_session), 
 
     new_topic = Topic(
         subject_id=payload.subject_id,
-        name=payload.name
+        name=payload.name,
     )
     session.add(new_topic)
     session.commit()
     session.refresh(new_topic)
     return new_topic
 
+
+# Wait for Ollama to be ready before heavy LLM work
 def _wait_for_ollama_ready(timeout_seconds: int = 90, poll_interval: int = 5) -> bool:
     ollama_url = os.getenv("OLLAMA_URL", "http://ollama:11434").rstrip("/")
     tags_url = f"{ollama_url}/api/tags"
@@ -258,11 +374,11 @@ def _wait_for_ollama_ready(timeout_seconds: int = 90, poll_interval: int = 5) ->
     return False
 
 
-# this runs the heavy PDF processing + quiz generation in the background
+# Background task: process PDF, embed, and generate quiz
 def process_pdf_in_background(file_path: str, topic_id: int, material_id: int):
     with Session(engine) as background_session:
         try:
-            # Update status to embedding
+            # Mark material as embedding
             material = background_session.get(Material, material_id)
             if material:
                 material.processing_status = "embedding"
@@ -274,10 +390,10 @@ def process_pdf_in_background(file_path: str, topic_id: int, material_id: int):
             store_document_embeddings(
                 chunk_results=chunk_results,
                 material_id=material_id,
-                session=background_session
+                session=background_session,
             )
 
-            # Update status to generating_quiz
+            # Mark material as generating_quiz
             if material:
                 material.processing_status = "generating_quiz"
                 background_session.add(material)
@@ -293,25 +409,35 @@ def process_pdf_in_background(file_path: str, topic_id: int, material_id: int):
                 return
 
             print("🧠 Ollama is ready. Starting background quiz generation for uploaded PDF...")
+            chunk_count = len(chunk_results)
+            if chunk_count < 20:
+                num_questions = 20
+            elif chunk_count < 40:
+                num_questions = 40
+            else:
+                num_questions = 60
+
+            print(f"📊 PDF has {chunk_count} chunks — generating {num_questions} questions.")
+
             generate_and_store_quiz(
                 session=background_session,
                 topic_id=topic_id,
                 material_id=material_id,
-                num_questions=60
+                num_questions=num_questions,
             )
 
-            # Update status to ready
+            # Mark material as ready
             if material:
                 material.processing_status = "ready"
                 background_session.add(material)
                 background_session.commit()
 
-            print("✅ Upload background task complete: embeddings stored and 60-question quiz generated.")
+            print("✅ Upload background task complete: embeddings stored and quiz generated.")
 
         except Exception as e:
             print(f"❌ Background AI Task Failed: {e}")
             background_session.rollback()
-            # Try to update status to failed
+            # Try to mark status as failed
             try:
                 with Session(engine) as error_session:
                     material = error_session.get(Material, material_id)
@@ -322,9 +448,16 @@ def process_pdf_in_background(file_path: str, topic_id: int, material_id: int):
             except Exception as status_error:
                 print(f"❌ Failed to update status to failed: {status_error}")
 
-# this uploads a PDF and kicks off background processing
+
+# Upload a PDF and kick off background processing
 @app.post("/materials/upload")
-def add_material(background_tasks: BackgroundTasks, topic_id: int = Form(...), file: UploadFile = File(...), session: Session = Depends(get_session), current_user: User = Depends(get_current_user)):
+def add_material(
+    background_tasks: BackgroundTasks,
+    topic_id: int = Form(...),
+    file: UploadFile = File(...),
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+):
     topic = session.get(Topic, topic_id)
     print(f"📤 Upload request: topic_id={topic_id}, filename={file.filename}, user_id={current_user.id}")
     if not topic:
@@ -341,7 +474,7 @@ def add_material(background_tasks: BackgroundTasks, topic_id: int = Form(...), f
     new_material = Material(
         name=file.filename,
         file_path=file_path,
-        topic_id=topic_id
+        topic_id=topic_id,
     )
 
     session.add(new_material)
@@ -352,9 +485,16 @@ def add_material(background_tasks: BackgroundTasks, topic_id: int = Form(...), f
 
     return new_material
 
-# this generates a quiz from existing questions in the bank
+
+# Generate a quiz from existing questions (no LLM call here)
 @app.post("/quizzes/generate")
-def generate_quiz(payload: QuizCreate, session: Session = Depends(get_session), current_user: User = Depends(get_current_user)):
+def generate_quiz(
+    payload: QuizCreate,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+):
+    import random
+
     verified_topics = []
     for topic_id in payload.topic_ids:
         topic = session.get(Topic, topic_id)
@@ -365,29 +505,38 @@ def generate_quiz(payload: QuizCreate, session: Session = Depends(get_session), 
         verified_topics.append(topic)
 
     topic_id = payload.topic_ids[0]
-    material = session.exec(
-        select(Material).where(Material.topic_id == topic_id).order_by(Material.id.desc())
-    ).first()
 
+    # Ensure material exists
+    material = session.exec(
+        select(Material)
+        .where(Material.topic_id == topic_id)
+        .order_by(Material.id.desc())
+    ).first()
     if not material:
         raise HTTPException(status_code=400, detail="No materials uploaded for this topic")
 
-    generate_and_store_quiz(
-        session=session,
-        topic_id=topic_id,
-        material_id=material.id,
-        num_questions=payload.length,
-    )
+    # Ensure material is ready
+    if material.processing_status != "ready":
+        raise HTTPException(
+            status_code=400,
+            detail=f"Material is still processing ({material.processing_status}). Please wait and try again.",
+        )
 
-    new_questions = session.exec(
-        select(Question)
-        .where(Question.topic_id == topic_id)
-        .order_by(Question.id.desc())
-        .limit(payload.length)
+    # Pull existing questions
+    all_questions = session.exec(
+        select(Question).where(Question.topic_id == topic_id)
     ).all()
 
-    if not new_questions:
-        raise HTTPException(status_code=500, detail="Failed to generate quiz questions. Please try again.")
+    if not all_questions:
+        raise HTTPException(
+            status_code=400,
+            detail="No questions available for this topic. Please wait for upload processing to complete.",
+        )
+
+    selected_questions = random.sample(
+        all_questions,
+        min(payload.length, len(all_questions)),
+    )
 
     quiz = Quiz(
         topics=verified_topics,
@@ -396,7 +545,7 @@ def generate_quiz(payload: QuizCreate, session: Session = Depends(get_session), 
         difficulty_level=payload.difficulty_level,
         open_ended=payload.open_ended,
         length=payload.length,
-        questions=new_questions
+        questions=selected_questions,
     )
 
     session.add(quiz)
@@ -406,19 +555,23 @@ def generate_quiz(payload: QuizCreate, session: Session = Depends(get_session), 
     return quiz
 
 
-
-# this returns quiz details + questions when a quiz is started
+# Return quiz details + questions when a quiz is started
 @app.get("/quizzes/{quiz_id}/start-quiz", response_model=QuizRead)
-def start_quiz(quiz_id: int, session: Session = Depends(get_session), current_user: User = Depends(get_current_user)):
+def start_quiz(
+    quiz_id: int,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+):
     quiz = session.get(Quiz, quiz_id)
     if not quiz:
         raise HTTPException(status_code=404, detail="Quiz not found")
     if quiz.user_id != current_user.id:
         raise HTTPException(status_code=403, detail="You do not have access to this quiz")
-    quiz.questions
+    quiz.questions  # force load
     return quiz
 
-# this deletes a subject and its materials (including files)
+
+# Delete a subject and its materials (including files)
 @app.delete("/subjects/{subject_id}")
 def delete_subject(
     subject_id: int,
@@ -431,7 +584,6 @@ def delete_subject(
     if subject.user_id != current_user.id:
         raise HTTPException(status_code=403, detail="You do not have access to this subject")
 
-    # delete physical files for materials
     for topic in subject.topics:
         for material in topic.materials:
             if material.file_path and os.path.exists(material.file_path):
@@ -445,39 +597,56 @@ def delete_subject(
     return {"message": f"Subject '{subject.name}' successfully deleted."}
 
 
-# this deletes a topic and its materials
+# Delete a topic and its materials
 @app.delete("/topics/{topic_id}")
-def delete_topic(topic_id: int, session: Session = Depends(get_session), current_user: User = Depends(get_current_user)):
+def delete_topic(
+    topic_id: int,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+):
     topic = session.get(Topic, topic_id)
     if not topic:
         raise HTTPException(status_code=404, detail="Topic not found")
     if topic.subject.user_id != current_user.id:
         raise HTTPException(status_code=403, detail="You do not have access to this topic")
+
     for material in topic.materials:
         if material.file_path and os.path.exists(material.file_path):
             try:
                 os.remove(material.file_path)
             except Exception as e:
                 print(f"Failed to delete physical file {material.file_path}: {e}")
+
     session.delete(topic)
     session.commit()
     return {"message": f"Topic '{topic.name}' successfully deleted."}
 
-# this deletes a quiz
+
+# Delete a quiz
 @app.delete("/quizzes/{quiz_id}")
-def delete_quiz(quiz_id: int, session: Session = Depends(get_session), current_user: User = Depends(get_current_user)):
+def delete_quiz(
+    quiz_id: int,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+):
     quiz = session.get(Quiz, quiz_id)
     if not quiz:
         raise HTTPException(status_code=404, detail="Quiz not found")
     if quiz.user_id != current_user.id:
         raise HTTPException(status_code=403, detail="You do not have access to this quiz")
+
     session.delete(quiz)
     session.commit()
     return {"message": f"Quiz '{quiz.name}' successfully deleted."}
 
-# this deletes a material and its physical file
+
+# Delete a material and its physical file
 @app.delete("/materials/{material_id}")
-def delete_material(material_id: int, session: Session = Depends(get_session), current_user: User = Depends(get_current_user)):
+def delete_material(
+    material_id: int,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+):
     material = session.get(Material, material_id)
     if not material:
         raise HTTPException(status_code=404, detail="Material not found")
@@ -496,9 +665,13 @@ def delete_material(material_id: int, session: Session = Depends(get_session), c
 
     return {"message": f"Material '{material.name}' successfully deleted."}
 
-# this returns grouped quiz attempts for the current user
+
+# Return grouped quiz attempts for the current user
 @app.get("/attempts", response_model=List[QuizAttemptsGroup])
-def get_user_attempts(session: Session = Depends(get_session), current_user: User = Depends(get_current_user)):
+def get_user_attempts(
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+):
     statement = (
         select(Quiz, QuizAttempt)
         .join(QuizAttempt, QuizAttempt.quiz_id == Quiz.id)
@@ -515,20 +688,24 @@ def get_user_attempts(session: Session = Depends(get_session), current_user: Use
                 "quiz_id": quiz.id,
                 "quiz_name": quiz.name,
                 "total_questions": quiz.length,
-                "attempts": []
+                "attempts": [],
             }
 
         grouped_data[quiz.id]["attempts"].append({
             "id": attempt.id,
             "date": attempt.date,
-            "score": attempt.score
+            "score": attempt.score,
         })
 
     return list(grouped_data.values())
 
-# this returns mastery per topic for the current user
+
+# Return mastery per topic for the current user
 @app.get("/users/me/mastery", response_model=List[TopicMastery])
-def get_user_mastery(session: Session = Depends(get_session), current_user: User = Depends(get_current_user)):
+def get_user_mastery(
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+):
     statement = (
         select(Topic, Question, Response)
         .join(Question, Question.topic_id == Topic.id)
@@ -546,7 +723,7 @@ def get_user_mastery(session: Session = Depends(get_session), current_user: User
                 "topic_id": topic.id,
                 "topic_name": topic.name,
                 "total_attempted": 0,
-                "total_correct": 0
+                "total_correct": 0,
             }
 
         mastery_data[topic.id]["total_attempted"] += 1
@@ -564,9 +741,13 @@ def get_user_mastery(session: Session = Depends(get_session), current_user: User
 
     return final_output
 
-# this returns mastery history over time per topic
+
+# Return mastery history over time per topic
 @app.get("/users/me/mastery-history")
-def get_topic_mastery_history(session: Session = Depends(get_session), current_user: User = Depends(get_current_user)):
+def get_topic_mastery_history(
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+):
     statement = (
         select(Topic, QuizAttempt, Response)
         .join(Question, Question.topic_id == Topic.id)
@@ -586,7 +767,7 @@ def get_topic_mastery_history(session: Session = Depends(get_session), current_u
                 "topic_name": topic.name,
                 "running_correct": 0,
                 "running_total": 0,
-                "history": []
+                "history": [],
             }
 
         t = topics_dict[topic.id]
@@ -599,7 +780,7 @@ def get_topic_mastery_history(session: Session = Depends(get_session), current_u
             t["history"].append({
                 "attempt_id": attempt.id,
                 "date": attempt.date,
-                "percentage": 0.0
+                "percentage": 0.0,
             })
 
         t["history"][-1]["percentage"] = round(

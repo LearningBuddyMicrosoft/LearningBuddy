@@ -62,11 +62,7 @@ with st.form("generate_quiz_form"):
     with col2:
         length = st.number_input("Number of questions", min_value=1, max_value=50, value=10, step=1)
 
-    open_ended = st.toggle(
-        "Include open-ended questions",
-        value=False,
-        help="Mix free-text questions in alongside multiple-choice.",
-    )
+    
 
     submitted = st.form_submit_button("Generate Quiz", use_container_width=True)
 
@@ -86,7 +82,7 @@ if submitted:
             difficulty_level=int(difficulty),
             length=int(length),
             topic_ids=topic_ids,
-            open_ended=open_ended,
+            open_ended = False,
         )
 
     if not quiz:
