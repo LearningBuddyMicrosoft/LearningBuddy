@@ -145,7 +145,7 @@ with question_col:
 
     if current_q_type == "mcq":
         options = current_question.get("options", [])
-        display_options = ["Select an answer"] + options
+        display_options =  options
         current_answer = st.session_state.quiz_answers.get(current_qid)
         default_idx = (options.index(current_answer) + 1) if current_answer in options else 0
 

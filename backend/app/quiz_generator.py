@@ -131,7 +131,7 @@ CONTEXT:
             response = requests.post(
                 f"{OLLAMA_URL}/api/generate",
                 json={
-                    "model": "ollama3.1",
+                    "model": "llama3.1:8b",
                     "prompt": prompt,
                     "stream": False,
                     "options": {

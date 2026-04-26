@@ -39,7 +39,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(lifespan=lifespan)
 
 OLLAMA_URL = os.getenv("OLLAMA_URL")
-FEEDBACK_MODEL = os.getenv("OLLAMA_FEEDBACK_MODEL", "llama3.1")
+FEEDBACK_MODEL = os.getenv("OLLAMA_FEEDBACK_MODEL", "llama3.1:8b")
 
 @app.post("/register/")
 def register_user(user_create: UserCreate, session: Session = Depends(get_session)):
