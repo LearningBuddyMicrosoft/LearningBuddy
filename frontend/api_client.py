@@ -212,3 +212,11 @@ def get_user_mastery():
     elif res:
         st.error(res.json().get("detail", "Failed to load user mastery"))
     return None
+
+def get_all_quizzes():
+    res = api("GET", "/quizzes/")
+    if res and res.status_code == 200:
+        return res.json()
+    elif res:
+        st.error(res.json().get("detail", "Failed to load quizzes"))
+    return None
