@@ -40,7 +40,7 @@ def generate_and_store_quiz(session, topic_id: int, material_id: int, num_questi
 
     all_questions = []
 
-    # ✅ Generate 10 questions per difficulty level (1–3)
+    # ✅ Generate 20 questions per difficulty level (1–3)
     for difficulty in range(1, 4):
         print(f"\n🎯 Generating difficulty {difficulty} questions...")
 
@@ -58,7 +58,7 @@ def generate_and_store_quiz(session, topic_id: int, material_id: int, num_questi
         print("❌ No valid questions generated.")
         return
 
-    # ✅ Safety rebalance (ensures max 10 per difficulty)
+    # ✅ Safety rebalance (ensures max 20 per difficulty)
     bucket = defaultdict(list)
 
     for q in all_questions:
@@ -67,7 +67,7 @@ def generate_and_store_quiz(session, topic_id: int, material_id: int, num_questi
     final_questions = []
 
     for d in range(1, 4):
-        selected = bucket[d][:10]
+        selected = bucket[d][:20]
         print(f"✅ Difficulty {d}: {len(selected)} questions")
         final_questions.extend(selected)
 

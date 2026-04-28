@@ -81,6 +81,17 @@ class QuizRead(SQLModel):
     highscore: int
     questions: List[QuestionRead] = []
 
+class QuizDisplay(BaseModel):
+    id: int
+    name: str
+    difficulty_level: int
+    length: int
+    highscore: int
+    topic_ids: List[int] = [] 
+
+    class Config:
+        from_attributes = True
+
 class AttemptDetail(BaseModel):
     id: int
     date: str

@@ -17,6 +17,7 @@ pg = st.navigation(
         st.Page("pages/testpages/subject.py",       title="Switch Topic",  url_path="topic"),
         st.Page("pages/testpages/upload.py",        title="Upload Files",  url_path="upload"),
         st.Page("pages/testpages/generate_quiz.py", title="Generate Quiz", url_path="generate-quiz"),
+        st.Page("pages/testpages/select_quiz.py",   title="Select Quiz",   url_path="select-quiz"),
         st.Page("pages/testpages/take_quiz.py",     title="Take Quiz",     url_path="take-quiz"),
         st.Page("pages/testpages/results.py",       title="View Results",  url_path="results"),
         st.Page("pages/testpages/progress.py",      title="View Progress", url_path="progress"),

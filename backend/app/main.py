@@ -15,13 +15,7 @@ from .security import create_access_token, get_current_user, get_password_hash, 
 from .database import create_db_and_tables, get_session, engine
 from datetime import date
 from .models import Material, Question, Quiz, Response, Subject, Topic, User, QuizAttempt # From your previous steps
-from .schemas import (
-    DashboardRead, QuizAttemptsGroup, QuizCreate, QuizRead,
-    SubjectCreate, TopicCreate, TopicDetailedRead,
-    TopicMastery,  # ← kept from second file
-    UserCreate, StartAttempt, AnswerSubmission,
-    FinishAttempt, BatchSubmission
-)
+from.schemas import DashboardRead, QuizAttemptsGroup, QuizCreate, QuizDisplay, QuizRead, SubjectCreate, TopicCreate, TopicDetailedRead, TopicMastery, UserCreate, StartAttempt, AnswerSubmission, FinishAttempt, BatchSubmission
 
 app = FastAPI()
 
@@ -426,6 +420,27 @@ def start_quiz(quiz_id: int, session: Session = Depends(get_session), current_us
         raise HTTPException(status_code=403, detail="You do not have access to this quiz")
     quiz.questions
     return quiz
+
+@app.get("/quizzes/", response_model=List[QuizDisplay])
+def get_all_quizzes(session: Session = Depends(get_session), current_user: User = Depends(get_current_user)):
+    # 1. Get all quizzes for this user
+    statement = select(Quiz).where(Quiz.user_id == current_user.id)
+    quizzes = session.exec(statement).all()
+    
+    # 2. Package them with their topic IDs
+    results = []
+    for q in quizzes:
+        results.append({
+            "id": q.id,
+            "name": q.name,
+            "difficulty_level": q.difficulty_level,
+            "length": q.length,
+            "highscore": q.highscore,
+            # Map the actual topic objects to just their IDs
+            "topic_ids": [topic.id for topic in q.topics] 
+        })
+        
+    return results
 
 @app.delete("/subjects/{subject_id}")
 def delete_subject(subject_id: int, session: Session = Depends(get_session), current_user: User = Depends(get_current_user)):
