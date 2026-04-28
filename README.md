@@ -38,15 +38,15 @@ Before setting up the project, ensure you have the following installed:
    OLLAMA_URL=http://ollama:11434
    # Optional: use an installed Ollama embedding model here
    OLLAMA_EMBEDDING_MODEL=nomic-embed-text
-   OLLAMA_QUIZ_MODEL=qwen2.5:1.5b-instruct
-   OLLAMA_FEEDBACK_MODEL=qwen2.5:1.5b-instruct
+   OLLAMA_QUIZ_MODEL=qwen2.5:3b-instruct
+   OLLAMA_FEEDBACK_MODEL=qwen2.5:3b-instruct
    OLLAMA_TEMPERATURE=0.18
    OLLAMA_MAX_TOKENS=2048
    OLLAMA_NUM_PARALLEL=1
    OLLAMA_MAX_LOADED_MODELS=1
    ```
 
-   **Note:** Generate a secure `SECRET_KEY` for production use. You can use a tool like `openssl rand -hex 32` to generate one.
+   **Note:** Generate a secure `SECRET_KEY` for production use. You can use a tool like `openssl rand -hex 32` to generate one. The current setup uses the `qwen2.5:3b-instruct` model for both quiz and feedback generation.
 
 3. **Build and run the application:**
 
