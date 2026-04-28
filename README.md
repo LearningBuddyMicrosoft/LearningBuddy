@@ -30,23 +30,22 @@ Before setting up the project, ensure you have the following installed:
 
 2. **Set up environment variables:**
 
-   Copy the provided `.env` file or create a new one with the following content:
+   Copy the provided `.env.example` file to `.env` and configure it with your own values:
 
    ```dotenv
-   SECRET_KEY="your-secret-key-here"
-   DATABASE_URL=postgresql://admin:secretpassword@db:5432/learningbuddy
-   OLLAMA_URL=http://ollama:11434
-   # Optional: use an installed Ollama embedding model here
-   OLLAMA_EMBEDDING_MODEL=nomic-embed-text
-   OLLAMA_QUIZ_MODEL=qwen2.5:3b-instruct
-   OLLAMA_FEEDBACK_MODEL=qwen2.5:3b-instruct
-   OLLAMA_TEMPERATURE=0.18
-   OLLAMA_MAX_TOKENS=2048
-   OLLAMA_NUM_PARALLEL=1
-   OLLAMA_MAX_LOADED_MODELS=1
+   SECRET_KEY=<your-secure-secret-key>
+   DATABASE_URL=<your-database-url>
+   OLLAMA_URL=<your-ollama-url>
+   OLLAMA_EMBEDDING_MODEL=<embedding-model>
+   OLLAMA_QUIZ_MODEL=<quiz-model>
+   OLLAMA_FEEDBACK_MODEL=<feedback-model>
+   OLLAMA_TEMPERATURE=<temperature-value>
+   OLLAMA_MAX_TOKENS=<max-tokens>
+   OLLAMA_NUM_PARALLEL=<num-parallel>
+   OLLAMA_MAX_LOADED_MODELS=<max-loaded-models>
    ```
 
-   **Note:** Generate a secure `SECRET_KEY` for production use. You can use a tool like `openssl rand -hex 32` to generate one. The current setup uses the `qwen2.5:3b-instruct` model for both quiz and feedback generation.
+   **Note:** Generate a secure `SECRET_KEY` for production use. Update all configuration values with your specific setup. Refer to `.env.example` for configuration details.
 
 3. **Build and run the application:**
 
@@ -67,7 +66,7 @@ Before setting up the project, ensure you have the following installed:
    python backend/app/seed_api.py
    ```
 
-   This will create test users (e.g., "Jia Jun" with password "securepassword123") and sample subjects/materials.
+   This will create test users and sample subjects/materials. Check the seed script for default credentials.
 
 5. **Access the application:**
 
@@ -134,17 +133,15 @@ For local development, you can run PostgreSQL with pgvector locally or use the D
 Install Ollama locally from https://ollama.ai and pull the required models:
 
 ```bash
-ollama pull nomic-embed-text
-ollama pull qwen2.5:1.5b-instruct
+ollama pull <embedding-model>
+ollama pull <quiz-model>
 ```
 
 ## Usage
 
-After seeding the database, you can log in with test users such as:
-- Username: Jia Jun, Password: securepassword123
-- Or other users created by the seed script
+After seeding the database, you can log in with test users created by the seed script.
 
-1. Access the frontend at http://localhost:8501
+1. Access the frontend at the configured frontend URL
 2. Upload lecture materials (PDF, DOCX, PPTX)
 3. Generate quizzes from the uploaded content
 4. Take quizzes and receive AI-powered feedback
