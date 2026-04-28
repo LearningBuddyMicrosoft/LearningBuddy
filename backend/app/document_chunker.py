@@ -5,7 +5,7 @@ from pptx import Presentation
 from PIL import Image
 
 class DocumentChunker:
-    def __init__(self, overlap_size=25, chunk_size=50):
+    def __init__(self, overlap_size=50, chunk_size=100):
         self.overlap_size = overlap_size
         self.chunk_size = chunk_size
 
@@ -14,16 +14,18 @@ class DocumentChunker:
         try:
             with open(file_path, 'rb') as file:
                 reader = PyPDF2.PdfReader(file)
-                for page_num, page in enumerate(reader.pages, start=1):
+                text = ""
+                for page in reader.pages:
+                    # PyPDF2 sometimes returns None for empty pages, 
+                    # so we ensure it's a string before adding
                     extracted = page.extract_text()
                     if extracted:
-                        page_text = f"Page {page_num}: {extracted}"
-                        # Chunk the page text
-                        page_chunks = self._chunk_text(page_text)
-                        chunks.extend(page_chunks)
+                        text += extracted + " "
                 
                 # 🌟 THE SANITY CHECK 🌟
-                print(f"📄 Extracted a total of {len(chunks)} chunks from the PDF.")
+                print(f"📄 Extracted a total of {len(text)} characters from the PDF.")
+                
+                chunks.extend(self._chunk_text(text))
         except Exception as e:
             print(f"Error processing PDF: {e}")
         return chunks

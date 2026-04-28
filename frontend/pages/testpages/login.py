@@ -1,6 +1,3 @@
-import os
-from pathlib import Path
-
 import streamlit as st
 from api_client import login, register
 from pages.testpages.styles1 import apply_custom_css
@@ -20,11 +17,7 @@ if st.session_state.get("token"):
     st.switch_page("pages/testpages/dashboard.py")
 col1,col2,col3=st.columns([1,2,1])
 with col2:
-    logo_path = Path(__file__).resolve().parents[2] / "logo.png"
-    if logo_path.exists():
-        st.image(logo_path.read_bytes(), width=500)
-    else:
-        st.warning("Logo file not found.")
+    st.image("logo.png", width=500)
 #st.caption("Your adaptive AI study assistant")
 # st.divider()
 

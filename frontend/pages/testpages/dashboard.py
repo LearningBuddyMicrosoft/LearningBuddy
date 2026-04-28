@@ -1,5 +1,4 @@
 import streamlit as st
-from pathlib import Path
 from api_client import get_dashboard
 from pages.testpages.styles1 import apply_custom_css
 
@@ -24,11 +23,7 @@ with st.sidebar:
 st.markdown("Dashboard") 
 col1,col2,col3=st.columns([1,1,1])
 with col2:
-    logo_path = Path(__file__).resolve().parents[2] / "logo.png"
-    if logo_path.exists():
-        st.image(logo_path.read_bytes(), width=400)
-    else:
-        st.warning("Logo file not found.")
+    st.image("logo.png",width=400)
 data = get_dashboard()
 if not data:
     st.error("We couldn't load your dashboard right now. Please refresh or log in again.")
