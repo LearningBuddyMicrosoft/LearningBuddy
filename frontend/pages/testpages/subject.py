@@ -1,6 +1,5 @@
 import os
 import tempfile
-from pathlib import Path
 import streamlit as st
 import requests
 from pages.testpages.styles1 import apply_custom_css
@@ -36,11 +35,7 @@ st.markdown("""
 st.markdown("Subject/Topic") 
 col1,col2,col3=st.columns([1,1,1])
 with col2:
-    logo_path = Path("logo.png")
-    if logo_path.exists():
-        st.image(logo_path.read_bytes(), width=400)
-    else:
-        st.warning("Logo file not found.")
+    st.image("logo.png",width=400)
 st.markdown("<hr style='margin:0.2rem 0; border:1px solid #eee'>", unsafe_allow_html=True)
 
 @st.cache_data(show_spinner=False, ttl=30)

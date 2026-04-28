@@ -1,6 +1,5 @@
 import os
 import tempfile
-from pathlib import Path
 import streamlit as st
 from pages.testpages.styles1 import apply_custom_css
 apply_custom_css()
@@ -12,10 +11,8 @@ from api_client import (
     upload_material,
 )
 st.set_page_config(page_title="Upload – Learning Buddy", page_icon="🎓", layout="wide")
-if "token" not in st.session_state or not st.session_state.token:
-    st.error("You must log in before uploading.")
-    st.stop()
-
+if not st.session_state.get("token"):
+    st.switch_page("pages/testpages/login.py")
 
 st.markdown("""
 <style>
@@ -33,11 +30,7 @@ with st.sidebar:
 st.markdown("Upload") 
 col1,col2,col3=st.columns([1,1,1])
 with col2:
-    logo_path = Path(__file__).resolve().parents[2] / "logo.png"
-    if logo_path.exists():
-        st.image(str(logo_path), width=400)
-    else:
-        st.info("Logo not found")
+    st.image("logo.png",width=400)
 
 def load_dashboard():
     return get_dashboard()
