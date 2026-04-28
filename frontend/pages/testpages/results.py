@@ -97,7 +97,7 @@ with side_col:
         unsafe_allow_html=True,
     )
     if st.button("Take Another Quiz", use_container_width=True, type="primary"):
-        st.switch_page("pages/testpages/generate_quiz.py")
+        st.switch_page("pages/testpages/select_quiz.py")
     if st.button("Back to Dashboard", use_container_width=True):
         st.switch_page("pages/testpages/dashboard.py")
 

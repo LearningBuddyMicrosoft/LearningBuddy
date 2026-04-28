@@ -147,7 +147,7 @@ with question_col:
         options = current_question.get("options", [])
         display_options =  options
         current_answer = st.session_state.quiz_answers.get(current_qid)
-        default_idx = (options.index(current_answer) + 1) if current_answer in options else 0
+        default_idx = options.index(current_answer) if current_answer in options else 0
 
         choice = st.radio(
             label="Answer choices",
