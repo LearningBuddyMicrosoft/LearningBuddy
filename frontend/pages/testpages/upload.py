@@ -75,5 +75,5 @@ else:
             st.error("Upload failed. Check the backend logs.")
 col1,col2,col3=st.columns([1,2,1])
 with col2:
-    if st.button("Generate Quiz", use_container_width=True, disabled=not all_topics):
+    if st.button("Generate Quiz", use_container_width=True,disabled=uploaded_file is None):
                 st.switch_page("pages/testpages/generate_quiz.py")

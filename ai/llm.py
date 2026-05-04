@@ -165,6 +165,7 @@ def generate_quiz_fast(
     context_chunks: List[Dict[str, Any]],
     num_questions: int,
     max_attempts: int = 10,
+    batch_size: int = 10,
 ) -> List[MCQ]:
     """Generate MCQs from context chunks, filtering out hallucinated questions."""
     if num_questions <= 0:
@@ -176,7 +177,8 @@ def generate_quiz_fast(
     while attempts < max_attempts and len(collected) < num_questions:
         attempts += 1
         remaining = num_questions - len(collected)
-        prompt = build_prompt(context_chunks, remaining)
+        request_count = min(batch_size, remaining)
+        prompt = build_prompt(context_chunks, request_count)
 
         try:
             raw = call_llm(prompt)
@@ -189,6 +191,7 @@ def generate_quiz_fast(
             print(f"LLM returned no valid MCQs (attempt {attempts})")
             continue
 
+        print(f"LLM returned {len(batch)} parsed MCQs on attempt {attempts}")
         for mcq in batch:
             if len(collected) >= num_questions:
                 break
@@ -250,6 +253,7 @@ def generate_feedback_fast(
     - Be encouraging but honest.
     - Only use the information provided below.
     - Do not invent new facts.
+    - Do not use the characters '<' or '>' in any returned string values.
     - Return ONLY valid JSON. No markdown. No code fences. No extra text.
 
     Student attempt:
@@ -277,6 +281,10 @@ def generate_feedback_fast(
         # Validate expected keys exist
         if "summary" not in result or "details" not in result:
             raise ValueError("Missing required keys in LLM response")
+        return result
+    except Exception as e:
+        print(f"LLM feedback parse failed: {e}\nRaw response: {raw[:500]}")
+        return fallback_feedback(questions_payload, answers_payload)
         return result
     except Exception as e:
         print(f"LLM feedback parse failed: {e}\nRaw response: {raw[:500]}")

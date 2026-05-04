@@ -2,9 +2,9 @@ import streamlit as st
 from pathlib import Path
 from api_client import get_dashboard
 from pages.testpages.styles1 import apply_custom_css
+apply_custom_css()
 
 st.set_page_config(page_title="Dashboard – Learning Buddy", page_icon="🎓", layout="wide")
-apply_custom_css()
 if not st.session_state.get("token"):
     st.switch_page("pages/testpages/login.py")
 
@@ -31,7 +31,6 @@ with col2:
         st.warning("Logo file not found.")
 data = get_dashboard()
 if not data:
-    st.error("We couldn't load your dashboard right now. Please refresh or log in again.")
     st.stop()
 
 st.markdown(f"### Welcome back , {data['username']} 👋")

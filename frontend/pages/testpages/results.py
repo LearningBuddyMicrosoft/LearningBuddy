@@ -1,3 +1,6 @@
+import html
+import re
+
 import streamlit as st
 
 from api_client import get_user_attempts, finish_attempt
@@ -41,6 +44,13 @@ if cache_key not in st.session_state:
             st.session_state[cache_key] = graded
 
 graded = st.session_state.get(cache_key, {})
+
+def sanitize_text(value: str) -> str:
+    text = str(value or "")
+    text = re.sub(r"<\s*>", "", text)
+    text = text.replace("</>", "").replace("<>", "")
+    return html.escape(text).replace("\n", "  \n")
+
 
 # extract graded data
 score = graded.get("score", 0)
@@ -100,12 +110,12 @@ with top_col:
             st.markdown("<div class='section-title'>Detailed Feedback</div>", unsafe_allow_html=True)
 
             for i, item in enumerate(graded_questions, start=1):
-                question_text = item.get("question_text", "")
-                your = item.get("your_answer")
-                correct = item.get("correct_answer")
-                explanation = item.get("explanation", "")
-                practice_tip = item.get("practice_tip", "")
-                source = item.get("source", "")
+                question_text = sanitize_text(item.get("question_text", ""))
+                your = sanitize_text(item.get("your_answer", ""))
+                correct = sanitize_text(item.get("correct_answer", ""))
+                explanation = sanitize_text(item.get("explanation", ""))
+                practice_tip = sanitize_text(item.get("practice_tip", ""))
+                source = sanitize_text(item.get("source", ""))
 
                 is_correct = your == correct
                 icon = "✅" if is_correct else "❌"

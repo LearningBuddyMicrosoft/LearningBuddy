@@ -9,17 +9,29 @@ def questions_to_models(questions_json: list[dict], topic_id: int) -> list[Quest
 
     models = []
 
+    difficulty_map = {
+        "easy": 1,
+        "medium": 2,
+        "hard": 3,
+    }
+
     for q in questions_json:
         try:
+            difficulty_value = q.get("difficulty", 2)
+            if isinstance(difficulty_value, str):
+                difficulty_value = difficulty_map.get(difficulty_value.strip().lower(), 2)
+            else:
+                difficulty_value = int(difficulty_value)
+
             model = Question(
                 topic_id=topic_id,
                 question_type=q.get("question_type", "MCQ"),
-                difficulty=int(q.get("difficulty", 5)),
-                question_text=q.get("question", ""),          # FIXED
+                difficulty=difficulty_value,
+                question_text=q.get("question", ""),
                 options=q.get("options", []),
-                correct_answer=q.get("answer", ""),           # FIXED
-                explanation=q.get("explanation", ""),         # FIXED
-                source=q.get("source", "")                    # FIXED
+                correct_answer=q.get("answer", ""),
+                explanation=q.get("explanation", ""),
+                source=q.get("source", "")
             )
             models.append(model)
         except Exception as e:

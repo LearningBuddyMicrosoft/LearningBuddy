@@ -40,6 +40,7 @@ def generate_and_store_quiz(session, topic_id: int, material_id: int, num_questi
             context_chunks=context_chunks,
             num_questions=num_questions,
             max_attempts=20,
+            batch_size=10,
         )
     except Exception as e:
         print(f"❌ LLM error while generating quiz: {e}")
@@ -69,6 +70,10 @@ def generate_and_store_quiz(session, topic_id: int, material_id: int, num_questi
 
     # converts dicts into SQLModel objects and saves them
     db_objects = questions_to_models(final_questions, topic_id)
+    if not db_objects:
+        print("❌ No valid questions to save. Aborting.")
+        return
+
     save_questions(session, db_objects)
 
     print("✅ Success! RAG pipeline complete.")
