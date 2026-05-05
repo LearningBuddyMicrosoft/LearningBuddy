@@ -3,18 +3,22 @@ import streamlit as st
 from api_client import submit_batch_answers
 from pages.testpages.styles1 import apply_custom_css, apply_quiz_page_css
 
+# page setup
 st.set_page_config(page_title="Take Quiz – Learning Buddy", page_icon="🎓", layout="wide")
 apply_custom_css()
 
 
 def goto_question(index: int):
+    # clamp navigation index to valid range
     if questions:
         st.session_state.current_question_index = max(0, min(index, len(questions) - 1))
 
 
+# require login
 if not st.session_state.get("token"):
     st.switch_page("pages/testpages/login.py")
 
+# require active quiz + attempt
 if not st.session_state.get("quiz_data") or not st.session_state.get("attempt_id"):
     st.warning("No active quiz found. Please generate a quiz first.")
     if st.button("Generate a Quiz"):
@@ -31,6 +35,7 @@ attempt_id = st.session_state.attempt_id
 questions = quiz_data.get("questions", [])
 quiz_name = quiz_data.get("name", "Quiz")
 
+# store answers and current index in session
 if "quiz_answers" not in st.session_state:
     st.session_state.quiz_answers = {}
 
@@ -44,9 +49,7 @@ if not questions:
 goto_question(st.session_state.current_question_index)
 apply_quiz_page_css()
 
-answered_count = sum(1 for q in questions if st.session_state.quiz_answers.get(q["id"]))
-remaining_count = len(questions) - answered_count
-completion_ratio = answered_count / len(questions) if questions else 0
+# progress metrics
 current_index = st.session_state.current_question_index
 current_question = questions[current_index]
 current_qid = current_question["id"]
@@ -54,10 +57,14 @@ current_q_text = current_question.get(
     "text",
     current_question.get("question_text", f"Question {current_index + 1}"),
 )
-current_q_type = current_question.get(
-    "type",
-    current_question.get("question_type", "mcq"),
-).lower()
+
+current_option_state = st.session_state.get(f"mcq_{current_qid}")
+answered_answers = dict(st.session_state.quiz_answers)
+if current_option_state is not None:
+    answered_answers[current_qid] = current_option_state
+answered_count = sum(1 for q in questions if answered_answers.get(q["id"]))
+remaining_count = len(questions) - answered_count
+completion_ratio = answered_count / len(questions) if questions else 0
 
 st.markdown("<div class='quiz-shell'>", unsafe_allow_html=True)
 st.markdown(
@@ -121,9 +128,14 @@ with nav_col:
         is_current = idx == st.session_state.current_question_index
         button_label = f"Q{idx + 1} · Answered" if answered else f"Q{idx + 1}"
         button_type = "primary" if is_current else "secondary"
-        if st.button(button_label, key=f"jump_{qid}", use_container_width=True, type=button_type):
-            goto_question(idx)
-            st.rerun()
+        st.button(
+            button_label,
+            key=f"jump_{qid}",
+            use_container_width=True,
+            type=button_type,
+            on_click=goto_question,
+            args=(idx,),
+        )
 
     st.markdown(
         f"<div class='footer-note'>Answered {answered_count} of {len(questions)}. "
@@ -137,62 +149,50 @@ with question_col:
         <span class="question-pill">Question {st.session_state.current_question_index + 1}</span>
         <div class="question-title">{current_q_text}</div>
         <div class="question-meta">
-            {"Multiple choice" if current_q_type == "mcq" else "Open-ended"} question
+            Multiple choice question
         </div>
         """,
         unsafe_allow_html=True,
     )
 
-    if current_q_type == "mcq":
-        options = current_question.get("options", [])
-        display_options =  options
-        current_answer = st.session_state.quiz_answers.get(current_qid)
-        default_idx = options.index(current_answer) if current_answer in options else 0
+    # MCQ only (open-ended disabled in generator)
+    options = current_question.get("options", [])
+    display_options = options
+    current_answer = st.session_state.quiz_answers.get(current_qid)
+    default_idx = options.index(current_answer) if current_answer in options else None
 
-        choice = st.radio(
-            label="Answer choices",
-            options=display_options,
-            index=default_idx,
-            key=f"mcq_{current_qid}",
-            label_visibility="collapsed",
-        )
-        st.session_state.quiz_answers[current_qid] = choice if choice != "Select an answer" else None
-        st.markdown(
-            "<div class='answer-hint'>Pick the option that best matches your understanding.</div>",
-            unsafe_allow_html=True,
-        )
-    else:
-        answer_text = st.text_area(
-            label="Your answer",
-            value=st.session_state.quiz_answers.get(current_qid) or "",
-            key=f"oe_{current_qid}",
-            placeholder="Write a clear, concise answer here...",
-            label_visibility="collapsed",
-        )
-        st.session_state.quiz_answers[current_qid] = answer_text.strip() or None
-        st.markdown(
-            "<div class='answer-hint'>Aim for a direct answer first, then add a little detail if it helps.</div>",
-            unsafe_allow_html=True,
-        )
+    choice = st.radio(
+        label="Answer choices",
+        options=display_options,
+        index=default_idx,
+        key=f"mcq_{current_qid}",
+        label_visibility="collapsed",
+    )
+    st.session_state.quiz_answers[current_qid] = choice
+
+    st.markdown(
+        "<div class='answer-hint'>Pick the option that best matches your understanding.</div>",
+        unsafe_allow_html=True,
+    )
 
     st.markdown("<div style='height: 0.6rem;'></div>", unsafe_allow_html=True)
     prev_col, next_col = st.columns(2, gap="medium")
     with prev_col:
-        if st.button(
+        st.button(
             "Previous",
             use_container_width=True,
             disabled=st.session_state.current_question_index == 0,
-        ):
-            goto_question(st.session_state.current_question_index - 1)
-            st.rerun()
+            on_click=goto_question,
+            args=(st.session_state.current_question_index - 1,),
+        )
     with next_col:
-        if st.button(
+        st.button(
             "Next",
             use_container_width=True,
             disabled=st.session_state.current_question_index == len(questions) - 1,
-        ):
-            goto_question(st.session_state.current_question_index + 1)
-            st.rerun()
+            on_click=goto_question,
+            args=(st.session_state.current_question_index + 1,),
+        )
 
 unanswered = [
     f"Q{i + 1}"
@@ -220,9 +220,9 @@ st.markdown("</div>", unsafe_allow_html=True)
 
 if do_submit:
     answers_payload = [
-        {"attempt_id": attempt_id, "question_id": qid, "selected_option": answer}
+        {"attempt_id": attempt_id, "question_id": int(qid), "selected_option": answer}
         for qid, answer in st.session_state.quiz_answers.items()
-        if answer
+        if answer is not None
     ]
 
     with st.spinner("Submitting and grading your answers..."):
@@ -232,7 +232,6 @@ if do_submit:
         st.error("Failed to submit answers. Please try again.")
         st.stop()
 
-    st.session_state.last_quiz_result = batch_result
     st.session_state.last_attempt_id = attempt_id
     st.session_state.last_quiz_name = quiz_name
     st.session_state.last_answers_count = len(answers_payload)

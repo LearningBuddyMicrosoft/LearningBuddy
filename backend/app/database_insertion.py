@@ -11,13 +11,26 @@ def questions_to_models(questions_json: list[dict], topic_id: int) -> list[Quest
 
     for q in questions_json:
         try:
+            # Map difficulty string to int
+            diff_str = q.get("difficulty", "medium").lower()
+            if diff_str == "easy":
+                diff_int = 1
+            elif diff_str == "medium":
+                diff_int = 2
+            elif diff_str == "hard":
+                diff_int = 3
+            else:
+                diff_int = 2  # default to medium
+
             model = Question(
                 topic_id=topic_id,
                 question_type=q.get("question_type", "MCQ"),
-                difficulty=int(q.get("difficulty", 5)),
-                question_text=q.get("question_text", ""),
+                difficulty=diff_int,
+                question_text=q.get("question", ""),          # FIXED
                 options=q.get("options", []),
-                correct_answer=q.get("correct_answer", "")
+                correct_answer=q.get("answer", ""),           # FIXED
+                explanation=q.get("explanation", ""),         # FIXED
+                source=q.get("source", "")                    # FIXED
             )
             models.append(model)
         except Exception as e:
@@ -25,6 +38,7 @@ def questions_to_models(questions_json: list[dict], topic_id: int) -> list[Quest
             print(f"ERROR: {e}")
 
     return models
+
 
 def store_document_embeddings(chunk_results: list[dict], material_id: int, session):
     """
