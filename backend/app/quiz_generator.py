@@ -49,23 +49,35 @@ def generate_and_store_quiz(session, topic_id: int, material_id: int, num_questi
         print("❌ No questions generated.")
         return
 
-    # gets the material name to attach as a source label
+    # gets the material name for source labels and fallback values
     material = session.get(Material, material_id)
     material_filename = material.name.replace(".pdf", "") if material else "Document"
 
     # converts MCQ objects into dicts ready for DB insertion
     final_questions = []
     for mcq in mcqs:
-        # FIX: was f"{material_filename} - {mcq.source}" which produced "Forces - Forces"
-        # because mcq.source is LLM-generated and just repeats the topic name.
-        # Now uses topic_name from the DB (reliable) instead.
+        source_label = mcq.source.strip()
+        lower_source = source_label.lower()
+        fallback_source = f"{material_filename} ({topic_name})"
+
+        # Keep LLM source when it is informative and not just the topic name repeated.
+        if not source_label or lower_source in {
+            topic_name.lower(),
+            material_filename.lower(),
+            f"{material_filename} - {topic_name}".lower(),
+            f"{topic_name} - {topic_name}".lower(),
+        }:
+            source_label = fallback_source
+        elif material_filename.lower() not in lower_source:
+            source_label = f"{material_filename} - {source_label}"
+
         final_questions.append({
             "question": mcq.question,
             "options": mcq.options,
             "answer": mcq.answer,
             "explanation": mcq.explanation,
             "difficulty": mcq.difficulty,
-            "source": f"{material_filename} ({topic_name})",
+            "source": source_label,
         })
 
     print(f"\n💾 SAVING {len(final_questions)} QUESTIONS TO DB...")
@@ -117,8 +129,24 @@ def retrieve_relevant_context(
     if not filtered:
         filtered = results
 
-    # attaches the filename for source tracking
+    # attaches the filename for source tracking, including page hints when available
     material = session.get(Material, material_id)
-    filename = material.name.replace(".pdf", "") if material else "Document"
+    base_filename = material.name.replace(".pdf", "") if material else "Document"
 
-    return [{"id": c.id, "text": c.text_content, "filename": filename} for c in filtered]
+    context = []
+    for c in filtered:
+        text = c.text_content or ""
+        page_label = ""
+        if isinstance(text, str):
+            import re
+            match = re.match(r"Page\s*(\d+):", text)
+            if match:
+                page_label = f"Page {match.group(1)}"
+
+        filename = base_filename
+        if page_label:
+            filename = f"{base_filename} - {page_label}"
+
+        context.append({"id": c.id, "text": text, "filename": filename})
+
+    return context

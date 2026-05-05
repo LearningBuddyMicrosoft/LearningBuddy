@@ -50,10 +50,6 @@ goto_question(st.session_state.current_question_index)
 apply_quiz_page_css()
 
 # progress metrics
-answered_count = sum(1 for q in questions if st.session_state.quiz_answers.get(q["id"]))
-remaining_count = len(questions) - answered_count
-completion_ratio = answered_count / len(questions) if questions else 0
-
 current_index = st.session_state.current_question_index
 current_question = questions[current_index]
 current_qid = current_question["id"]
@@ -61,6 +57,14 @@ current_q_text = current_question.get(
     "text",
     current_question.get("question_text", f"Question {current_index + 1}"),
 )
+
+current_option_state = st.session_state.get(f"mcq_{current_qid}")
+answered_answers = dict(st.session_state.quiz_answers)
+if current_option_state is not None:
+    answered_answers[current_qid] = current_option_state
+answered_count = sum(1 for q in questions if answered_answers.get(q["id"]))
+remaining_count = len(questions) - answered_count
+completion_ratio = answered_count / len(questions) if questions else 0
 
 st.markdown("<div class='quiz-shell'>", unsafe_allow_html=True)
 st.markdown(
@@ -124,9 +128,14 @@ with nav_col:
         is_current = idx == st.session_state.current_question_index
         button_label = f"Q{idx + 1} · Answered" if answered else f"Q{idx + 1}"
         button_type = "primary" if is_current else "secondary"
-        if st.button(button_label, key=f"jump_{qid}", use_container_width=True, type=button_type):
-            goto_question(idx)
-            st.rerun()
+        st.button(
+            button_label,
+            key=f"jump_{qid}",
+            use_container_width=True,
+            type=button_type,
+            on_click=goto_question,
+            args=(idx,),
+        )
 
     st.markdown(
         f"<div class='footer-note'>Answered {answered_count} of {len(questions)}. "
@@ -169,21 +178,21 @@ with question_col:
     st.markdown("<div style='height: 0.6rem;'></div>", unsafe_allow_html=True)
     prev_col, next_col = st.columns(2, gap="medium")
     with prev_col:
-        if st.button(
+        st.button(
             "Previous",
             use_container_width=True,
             disabled=st.session_state.current_question_index == 0,
-        ):
-            goto_question(st.session_state.current_question_index - 1)
-            st.rerun()
+            on_click=goto_question,
+            args=(st.session_state.current_question_index - 1,),
+        )
     with next_col:
-        if st.button(
+        st.button(
             "Next",
             use_container_width=True,
             disabled=st.session_state.current_question_index == len(questions) - 1,
-        ):
-            goto_question(st.session_state.current_question_index + 1)
-            st.rerun()
+            on_click=goto_question,
+            args=(st.session_state.current_question_index + 1,),
+        )
 
 unanswered = [
     f"Q{i + 1}"

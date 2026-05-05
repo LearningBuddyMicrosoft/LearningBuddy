@@ -97,7 +97,7 @@ Each question MUST have exactly these fields:
 - "answer": string — must match one option exactly.
 - "explanation": string — brief explanation of why the answer is correct.
 - "difficulty": one of ["easy", "medium", "hard"].
-- "source": short label from the provided context (filename or topic name, NOT a page number).
+- "source": short label from the provided context (filename, topic name, or page hint when available).
 
 Respond with ONLY a valid JSON array. No prose, no markdown, no code fences, no extra text.
 """).strip()
@@ -337,11 +337,17 @@ def generate_feedback_fast(
         except Exception:
             continue
 
-    # Build summary with strengths/weaknesses from model
-    summary_text = model_feedback.get("summary", "")
+    # Build summary with strengths/weaknesses from model, but keep score deterministic
+    percent = round((correct_count / total) * 100) if total > 0 else 0
     strengths = model_feedback.get("strengths", [])
     weaknesses = model_feedback.get("weaknesses", [])
-    
+    model_summary = model_feedback.get("summary", "")
+
+    if model_summary:
+        summary_text = f"You scored {correct_count}/{total} ({percent}%). {model_summary}"
+    else:
+        summary_text = f"You scored {correct_count}/{total} ({percent}%). Review the results below for the key strengths and areas to improve."
+
     # Format with better HTML structure for visual appeal
     full_summary = f"<div style='line-height: 1.8; font-size: 1.1em;'>"
     full_summary += f"<p><b>{summary_text}</b></p>"
@@ -396,15 +402,15 @@ def fallback_feedback(
     pct = (correct / total * 100) if total > 0 else 0
 
     if pct == 100:
-        summary = f"You scored {correct}/{total} — perfect score! Outstanding work."
+        summary = f"You scored {correct}/{total} ({pct}%) — perfect score! Outstanding work."
     elif pct >= 80:
-        summary = f"You scored {correct}/{total} — excellent work! Just a few areas to polish."
+        summary = f"You scored {correct}/{total} ({pct}%) — excellent work! Just a few areas to polish."
     elif pct >= 60:
-        summary = f"You scored {correct}/{total} — good effort. Review the questions you missed and try again."
+        summary = f"You scored {correct}/{total} ({pct}%) — good effort. Review the questions you missed and try again."
     elif pct >= 40:
-        summary = f"You scored {correct}/{total} — keep going. Focus on the explanations for incorrect answers."
+        summary = f"You scored {correct}/{total} ({pct}%) — keep going. Focus on the explanations for incorrect answers."
     else:
-        summary = f"You scored {correct}/{total} — review the material carefully and try again."
+        summary = f"You scored {correct}/{total} ({pct}%) — review the material carefully and try again."
 
     details = []
     for q in questions_payload:
