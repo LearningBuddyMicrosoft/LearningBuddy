@@ -1,4 +1,5 @@
 import streamlit as st
+from pathlib import Path
 from api_client import get_dashboard, generate_quiz, start_quiz, start_attempt
 from pages.testpages.styles1 import apply_custom_css
 apply_custom_css()
@@ -12,31 +13,41 @@ st.markdown("""
     padding-top: 2.5rem; 
 }
 </style>
-""", unsafe_allow_html=True)#removes top padding above logo
+""", unsafe_allow_html=True)
+
 with st.sidebar:
     if st.button("Log Out", use_container_width=True):
         st.session_state.token = None
         st.switch_page("pages/testpages/login.py")
 
 st.markdown("Generate a quiz") 
-col1,col2,col3=st.columns([1,1,1])
+col1, col2, col3 = st.columns([1, 1, 1])
 with col2:
-    st.image("logo.png",width=400)
+    logo_path = Path(__file__).resolve().parents[2] / "logo.png"
+    if logo_path.exists():
+        st.image(logo_path.read_bytes(), width=400)
+    else:
+        st.warning("Logo file not found.")
 st.caption("Select topics, configure your quiz, and let AI build it for you.")
 st.markdown("<hr style='margin:0.2rem 0; border:1px solid #eee'>", unsafe_allow_html=True)
 
+
+# FIX: Pass token as a parameter so each user gets their own cached result.
+# Without this, Streamlit shares the cache across all users/sessions,
+# meaning a fresh login would still see another user's (or an unauthenticated) result.
 @st.cache_data(show_spinner=False, ttl=30)
-def load_dashboard():
+def load_dashboard(token: str):
     return get_dashboard()
 
-dashboard = load_dashboard()
+
+dashboard = load_dashboard(st.session_state.token)
 subjects = dashboard.get("subjects", []) if dashboard else []
 all_topics = [t for s in subjects for t in s.get("topics", [])]
 
 if not all_topics:
     st.warning("You need at least one topic before generating a quiz.")
-    if st.button("Go to Manage"):
-        st.switch_page("pages/testpages/manage.py")
+    if st.button("Go to Manage Topics"):
+        st.switch_page("pages/testpages/subject.py")
     st.stop()
 
 topic_options = {t["name"]: t["id"] for t in all_topics}
@@ -57,12 +68,6 @@ with st.form("generate_quiz_form"):
     with col2:
         length = st.number_input("Number of questions", min_value=1, max_value=50, value=10, step=1)
 
-    open_ended = st.toggle(
-        "Include open-ended questions",
-        value=False,
-        help="Mix free-text questions in alongside multiple-choice.",
-    )
-
     submitted = st.form_submit_button("Generate Quiz", use_container_width=True)
 
 if submitted:
@@ -81,7 +86,7 @@ if submitted:
             difficulty_level=int(difficulty),
             length=int(length),
             topic_ids=topic_ids,
-            open_ended=open_ended,
+            open_ended=False,
         )
 
     if not quiz:
@@ -91,20 +96,12 @@ if submitted:
     st.success(f"Quiz '{quiz.get('name', quiz_name)}' generated!")
 
     with st.spinner("Preparing your quiz…"):
-        quiz_detail = start_quiz(quiz_id)       # fetches questions
-        attempt_id = start_attempt(quiz_id)     # creates attempt record
+        quiz_detail = start_quiz(quiz_id)
+        attempt_id = start_attempt(quiz_id)
 
     if not quiz_detail or not attempt_id:
         st.error("Quiz was generated but could not be started. Please try again.")
         st.stop()
-
-    # NOTE: We assume start_quiz returns:
-    #   { "id": int, "name": str, "questions": [
-    #       { "id": int, "text": str,
-    #         "type": "mcq" | "open_ended",
-    #         "options": ["A...", "B...", ...] }   # present only for MCQ
-    #   ]}
-    # Update field names in take_quiz.py too if your schema differs.
 
     st.session_state.quiz_data = quiz_detail
     st.session_state.attempt_id = attempt_id
