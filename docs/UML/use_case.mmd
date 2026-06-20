@@ -1,0 +1,34 @@
+flowchart LR
+    %% Define the Actors (Outside the system)
+    Student((Student))
+    Ollama((Ollama AI))
+
+    %% Define the System Boundary
+    subgraph Learning Buddy Application
+        direction TB
+        
+        %% Define the Use Cases (Ovals)
+        Login([Login / Authenticate])
+        Manage([Manage Subjects & Topics])
+        Upload([Upload PDF Material])
+        TakeQuiz([Take Auto-Generated Quiz])
+        Review([Review Mastery Dashboard])
+        
+        Generate([Generate Quiz Questions])
+        Grade([Analyze & Grade Answers])
+    end
+
+    %% Connect the Student Actor to their Use Cases
+    Student --- Login
+    Student --- Manage
+    Student --- Upload
+    Student --- TakeQuiz
+    Student --- Review
+
+    %% Connect the AI Actor to its specific Use Cases
+    Generate --- Ollama
+    Grade --- Ollama
+
+    %% Optional: Show relationships between Use Cases (<<includes>>)
+    TakeQuiz -.->|<<includes>>| Generate
+    TakeQuiz -.->|<<includes>>| Grade

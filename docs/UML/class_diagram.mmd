@@ -1,0 +1,92 @@
+classDiagram
+    direction TB
+
+    class User {
+        +int id
+        +String username
+        +String hashed_password
+    }
+
+    class Subject {
+        +int id
+        +String name
+        +int user_id
+    }
+
+    class Topic {
+        +int id
+        +String name
+        +int subject_id
+    }
+
+    class Material {
+        +int id
+        +String name
+        +String file_path
+        +int topic_id
+    }
+
+    class DocumentChunk {
+        +int id
+        +String text_content
+        +Vector embedding
+        +int material_id
+    }
+
+    class Quiz {
+        +int id
+        +String name
+        +int difficulty_level
+        +bool open_ended
+        +int length
+        +int highscore
+        +int user_id
+    }
+
+    class Question {
+        +int id
+        +String question_type
+        +int difficulty
+        +String question_text
+        +List~String~ options
+        +String correct_answer
+        +int topic_id
+    }
+
+    class QuizAttempt {
+        +int id
+        +String date
+        +int score
+        +String feedback
+        +int user_id
+        +int quiz_id
+    }
+
+    class Response {
+        +int id
+        +String selected_option
+        +bool is_correct
+        +String feedback
+        +int attempt_id
+        +int question_id
+        +int user_id
+    }
+
+    %% Core Hierarchy (One-to-Many)
+    User "1" --> "*" Subject : owns
+    Subject "1" --> "*" Topic : contains
+    Topic "1" --> "*" Material : holds
+    Material "1" --> "*" DocumentChunk : chunks into
+    Topic "1" --> "*" Question : contains
+    
+    %% User Activity Tracking (One-to-Many)
+    User "1" --> "*" Quiz : creates
+    User "1" --> "*" QuizAttempt : takes
+    User "1" --> "*" Response : makes
+    Quiz "1" --> "*" QuizAttempt : logs
+    QuizAttempt "1" --> "*" Response : records
+    Question "1" --> "*" Response : answered_in
+
+    %% Many-to-Many Relationships (Resolved via Link Tables)
+    Topic "*" -- "*" Quiz : Quiz_TopicLink
+    Question "*" -- "*" Quiz : Question_QuizLink
